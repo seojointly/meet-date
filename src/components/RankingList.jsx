@@ -11,12 +11,14 @@ function formatDateLong(str) {
 const MEDAL = ['🥇', '🥈', '🥉']
 
 export default function RankingList({
-  allowedDates,     // Set<string>
-  availabilities,   // [{participant_id, dates, participants:{name,color}}]
-  participants,     // [{id, name, color}]
-  confirmedDate,    // string | null
-  onConfirm,        // (date: string) => void
-  onCancel,         // () => void
+  allowedDates,
+  availabilities,
+  participants,
+  confirmedDate,
+  onConfirm,
+  onCancel,
+  minParticipants,
+  maxParticipants,
 }) {
   const ranked = useMemo(() => {
     if (!allowedDates) return []
@@ -51,13 +53,14 @@ export default function RankingList({
     if (i > 0 && voters.length < ranked[i - 1][1].length) rankNum = i + 1
     const curRank      = rankNum
     const isConfirmed  = date === confirmedDate
-    const allAvailable = voters.length === total && total > 0
-    return { date, voters, curRank, isConfirmed, allAvailable }
+    const allAvailable = voters.length >= maxParticipants
+    const minMet       = voters.length >= minParticipants && !allAvailable
+    return { date, voters, curRank, isConfirmed, allAvailable, minMet }
   })
 
   return (
     <div className="space-y-2">
-      {items.map(({ date, voters, curRank, isConfirmed, allAvailable }) => (
+      {items.map(({ date, voters, curRank, isConfirmed, allAvailable, minMet }) => (
         <div
           key={date}
           className={[
@@ -66,17 +69,17 @@ export default function RankingList({
               ? 'border-green-300 bg-green-50'
               : allAvailable
                 ? 'border-green-200 bg-green-50 animate-rank-pulse'
-                : 'border-gray-100 bg-white',
+                : minMet
+                  ? 'border-blue-100 bg-blue-50'
+                  : 'border-gray-100 bg-white',
           ].join(' ')}
         >
-          {/* rank badge */}
           <span className="text-xl shrink-0 w-7 text-center">
             {curRank <= 3
               ? MEDAL[curRank - 1]
               : <span className="text-sm text-gray-500">{curRank}</span>}
           </span>
 
-          {/* date + voters */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-800 truncate">{formatDateLong(date)}</p>
             <div className="flex flex-wrap gap-1 mt-1">
@@ -90,12 +93,21 @@ export default function RankingList({
                 </span>
               ))}
             </div>
+            {allAvailable && (
+              <span className="inline-block mt-1.5 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                🎉 모두 가능!
+              </span>
+            )}
+            {minMet && (
+              <span className="inline-block mt-1.5 text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                ✅ 최소 인원 충족
+              </span>
+            )}
           </div>
 
-          {/* count + action */}
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <span className="text-xs font-bold text-gray-600">
-              {voters.length}/{total}명
+              {voters.length}/{maxParticipants}명
             </span>
             {isConfirmed ? (
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">

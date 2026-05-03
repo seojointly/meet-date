@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Users } from 'lucide-react'
-import { MAX_PARTICIPANTS } from '../hooks/useParticipants'
 
-export default function NameModal({ isOpen, participants, onSubmit }) {
+export default function NameModal({ isOpen, participants, maxParticipants, onSubmit }) {
   const [name, setName]       = useState('')
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
   const inputRef = useRef(null)
-  const isFull = participants.length >= MAX_PARTICIPANTS
+  const isFull = participants.length >= maxParticipants
 
   useEffect(() => {
     if (isOpen) {
@@ -38,14 +37,12 @@ export default function NameModal({ isOpen, participants, onSubmit }) {
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 bg-black/40 z-[60] transition-opacity duration-300 ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />
 
-      {/* Sheet — 모바일: 하단 bottom sheet / md+: 중앙 모달 */}
       <div
         className={[
           'fixed z-[70] bg-white shadow-2xl',
@@ -61,7 +58,6 @@ export default function NameModal({ isOpen, participants, onSubmit }) {
         aria-modal="true"
         aria-labelledby="name-modal-title"
       >
-        {/* Mobile drag handle */}
         <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5 md:hidden" />
 
         <div className="flex items-center gap-2 mb-1">
@@ -74,7 +70,7 @@ export default function NameModal({ isOpen, participants, onSubmit }) {
           <div className="text-center py-6 space-y-2">
             <p className="text-3xl">🙅</p>
             <p className="font-semibold text-gray-800">
-              정원이 가득 찼습니다 ({MAX_PARTICIPANTS}/{MAX_PARTICIPANTS})
+              정원이 가득 찼습니다 ({maxParticipants}/{maxParticipants})
             </p>
             <p className="text-sm text-gray-500">이 방에는 더 이상 참여할 수 없어요.</p>
           </div>

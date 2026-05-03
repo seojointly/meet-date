@@ -1,7 +1,5 @@
-import { MAX_PARTICIPANTS } from '../hooks/useParticipants'
-
-export default function ParticipantBar({ participants, availabilities }) {
-  const emptySlots = MAX_PARTICIPANTS - participants.length
+export default function ParticipantBar({ participants, availabilities, maxParticipants }) {
+  const emptySlots = Math.max(0, maxParticipants - participants.length)
 
   function hasSubmitted(p) {
     const avail = availabilities.find(a => a.participant_id === p.id)
@@ -37,7 +35,7 @@ export default function ParticipantBar({ participants, availabilities }) {
       ))}
 
       <span className="text-xs text-gray-400 ml-1 self-start pt-1 shrink-0">
-        {participants.length}/{MAX_PARTICIPANTS}명
+        {participants.length}/{maxParticipants}명
       </span>
     </div>
   )

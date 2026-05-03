@@ -137,9 +137,12 @@ export default function VotePage() {
     [allowedDates, availabilities, participants]
   )
 
+  const maxParticipants = room?.max_participants ?? 4
+  const minParticipants = room?.min_participants ?? 2
+
   // ── 핸들러 ─────────────────────────────────────────────────────
   async function handleRegister(name) {
-    await registerParticipant(name)
+    await registerParticipant(name, maxParticipants)
     setInitDates(false)
     setShowNameModal(false)
     showToast(`${name}으로 참여했어요!`, 'success')
@@ -273,7 +276,11 @@ export default function VotePage() {
 
               {!pLoading && (
                 <div className="mb-4 pb-4 border-b border-gray-100">
-                  <ParticipantBar participants={participants} availabilities={availabilities} />
+                  <ParticipantBar
+                    participants={participants}
+                    availabilities={availabilities}
+                    maxParticipants={maxParticipants}
+                  />
                 </div>
               )}
 
@@ -325,6 +332,8 @@ export default function VotePage() {
                 confirmedDate={confirmedDate}
                 onConfirm={handleConfirm}
                 onCancel={handleCancelAppointment}
+                minParticipants={minParticipants}
+                maxParticipants={maxParticipants}
               />
             </div>
           </div>
@@ -334,6 +343,7 @@ export default function VotePage() {
       <NameModal
         isOpen={showNameModal}
         participants={participants}
+        maxParticipants={maxParticipants}
         onSubmit={handleRegister}
       />
     </div>

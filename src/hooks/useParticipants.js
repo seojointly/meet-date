@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
-export const MAX_PARTICIPANTS = 4
-export const PARTICIPANT_COLORS = ['#22c55e', '#3b82f6', '#f97316', '#a855f7']
+export const PARTICIPANT_COLORS = [
+  '#22c55e', '#3b82f6', '#f97316', '#a855f7',
+  '#ec4899', '#f59e0b', '#06b6d4', '#8b5cf6',
+]
 
 const storageKey = (roomId) => `participant_${roomId}`
 
@@ -23,7 +25,6 @@ export function useParticipants(roomId) {
     setLoading(false)
   }, [roomId])
 
-  // localStorage 기반 세션 복원
   useEffect(() => {
     if (!roomId) return
     const restoreSession = async () => {
@@ -70,10 +71,10 @@ export function useParticipants(roomId) {
     return () => { supabase.removeChannel(ch) }
   }, [roomId, fetchParticipants])
 
-  const registerParticipant = useCallback(async (name) => {
-    if (participants.length >= MAX_PARTICIPANTS) {
+  const registerParticipant = useCallback(async (name, maxParticipants) => {
+    if (participants.length >= maxParticipants) {
       throw Object.assign(
-        new Error(`정원이 가득 찼습니다 (${participants.length}/${MAX_PARTICIPANTS})`),
+        new Error(`정원이 가득 찼습니다 (${participants.length}/${maxParticipants})`),
         { code: 'FULL' }
       )
     }

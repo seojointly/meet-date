@@ -16,13 +16,42 @@ function dateDiff(from, to) {
   return Math.round((new Date(to) - new Date(from)) / 86400000)
 }
 
+function Stepper({ label, value, min, max, onChange }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-gray-700">{label}</span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          disabled={value <= min}
+          className="min-h-[44px] min-w-[44px] rounded-xl border border-gray-200 bg-gray-50 font-bold text-xl text-gray-600 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          −
+        </button>
+        <span className="w-10 text-center font-bold text-gray-800 text-lg select-none">{value}</span>
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, value + 1))}
+          disabled={value >= max}
+          className="min-h-[44px] min-w-[44px] rounded-xl border border-gray-200 bg-gray-50 font-bold text-xl text-gray-600 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function HomePage() {
   const navigate = useNavigate()
   const showToast = useToast()
-  const [modalOpen, setModalOpen] = useState(false)
-  const [rangeFrom, setRangeFrom] = useState(null)
-  const [rangeTo, setRangeTo]     = useState(null)
-  const [creating, setCreating]   = useState(false)
+  const [modalOpen, setModalOpen]           = useState(false)
+  const [rangeFrom, setRangeFrom]           = useState(null)
+  const [rangeTo, setRangeTo]               = useState(null)
+  const [creating, setCreating]             = useState(false)
+  const [minParticipants, setMinParticipants] = useState(2)
+  const [maxParticipants, setMaxParticipants] = useState(4)
 
   function handleRangeChange(from, to) {
     setRangeFrom(from)
@@ -32,11 +61,24 @@ export default function HomePage() {
   function openModal() {
     setRangeFrom(null)
     setRangeTo(null)
+    setMinParticipants(2)
+    setMaxParticipants(4)
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
+  }
+
+  function handleMinChange(val) {
+    setMinParticipants(val)
+    if (val >= maxParticipants) {
+      setMaxParticipants(Math.min(val + 1, 8))
+    }
+  }
+
+  function handleMaxChange(val) {
+    setMaxParticipants(val)
   }
 
   async function handleCreate() {
@@ -45,7 +87,12 @@ export default function HomePage() {
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .insert({ date_from: rangeFrom, date_to: rangeTo })
+        .insert({
+          date_from: rangeFrom,
+          date_to: rangeTo,
+          min_participants: minParticipants,
+          max_participants: maxParticipants,
+        })
         .select('id')
         .single()
       if (error) throw error
@@ -151,6 +198,25 @@ export default function HomePage() {
                   </span>
                 </div>
               )}
+
+              {/* 인원 설정 */}
+              <div className="mt-5 space-y-3">
+                <p className="text-sm font-semibold text-gray-700">참여 인원 설정</p>
+                <Stepper
+                  label="최소 참여 인원"
+                  value={minParticipants}
+                  min={1}
+                  max={8}
+                  onChange={handleMinChange}
+                />
+                <Stepper
+                  label="최대 참여 인원"
+                  value={maxParticipants}
+                  min={minParticipants + 1}
+                  max={8}
+                  onChange={handleMaxChange}
+                />
+              </div>
             </div>
 
             {/* Modal footer */}
