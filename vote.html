@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>모임 날짜 투표</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header class="site-header">
+    <div class="container">
+      <span class="logo-icon">📅</span>
+      <a href="index.html" class="logo">모임 날짜 투표</a>
+    </div>
+  </header>
+
+  <!-- ── 이름 입력 모달 ── -->
+  <div id="name-modal-overlay" class="modal-overlay name-modal" role="dialog" aria-modal="true" aria-labelledby="name-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="name-modal-title">참여자 이름을 입력해주세요</h2>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:1rem">이름은 투표 결과에 표시됩니다.</p>
+        <form id="name-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="name-input">
+              이름 <span style="color:var(--color-error)">*</span>
+            </label>
+            <input
+              id="name-input"
+              class="form-input"
+              type="text"
+              placeholder="예) 홍길동"
+              maxlength="20"
+              autocomplete="off"
+              autocapitalize="words"
+            />
+            <p id="name-error" style="color:var(--color-error);font-size:0.8rem;margin-top:0.3rem;display:none">
+              이름을 입력해주세요.
+            </p>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg">
+            투표 시작하기
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <main class="main-content">
+    <div class="container">
+
+      <!-- 에러 상태 -->
+      <div id="error-state" class="card empty-state" hidden>
+        <div class="empty-icon">😕</div>
+        <p style="font-size:0.95rem;font-weight:500;color:var(--color-text)">존재하지 않는 방입니다.</p>
+        <p style="margin-top:0.25rem">링크를 다시 확인하거나 새 방을 만들어보세요.</p>
+        <a href="index.html" class="btn btn-outline" style="margin-top:1rem">새 방 만들기</a>
+      </div>
+
+      <!-- 투표 콘텐츠 (이름 입력 후 노출) -->
+      <div id="vote-content" hidden>
+
+        <!-- 확정 배너 -->
+        <div id="confirmed-banner" class="confirmed-banner" hidden>
+          <span class="confirmed-icon">✅</span>
+          <span id="confirmed-text" class="confirmed-text"></span>
+          <button id="cancel-confirm-btn" class="btn btn-ghost btn-sm">확정 취소</button>
+        </div>
+
+        <!-- 페이지 헤더 -->
+        <div class="page-title-area">
+          <h1>모임 날짜 투표</h1>
+          <p id="date-range-display" class="sub-text"></p>
+        </div>
+
+        <!-- 달력 카드 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-row">
+              <h2>날짜 선택</h2>
+              <span class="badge badge-success" id="my-vote-badge">0개 선택</span>
+            </div>
+            <p>초록색이 진할수록 많은 사람이 가능한 날짜예요. 내가 가능한 날짜를 선택하세요.</p>
+          </div>
+
+          <!-- 달력 컴포넌트 -->
+          <div id="calendar"></div>
+
+          <!-- 히트맵 범례 -->
+          <div class="cal-legend">
+            <span class="legend-label">투표 인원</span>
+            <div class="legend-scale">
+              <span class="legend-dot" style="background:transparent;border:1px solid var(--color-border)"></span>0명
+              <span class="legend-dot" style="background:#bbf7d0;margin-left:0.25rem"></span>1명
+              <span class="legend-dot" style="background:#4ade80;margin-left:0.25rem"></span>2명
+              <span class="legend-dot" style="background:#16a34a;margin-left:0.25rem"></span>3명
+              <span class="legend-dot" style="background:#14532d;margin-left:0.25rem"></span>4명+
+            </div>
+          </div>
+
+          <!-- 투표 저장 버튼 -->
+          <div style="margin-top:1rem">
+            <button id="save-vote-btn" class="btn btn-primary btn-full btn-lg" type="button" disabled>
+              투표 저장
+            </button>
+          </div>
+        </div>
+
+        <!-- 순위 리스트 카드 -->
+        <div class="card">
+          <div class="card-header">
+            <h2>📊 가능한 날짜 순위</h2>
+            <p id="rank-desc">아직 투표한 사람이 없어요.</p>
+          </div>
+          <div id="rank-list"></div>
+        </div>
+
+        <!-- 투표자 정보 -->
+        <div class="voter-info-row">
+          <span id="voter-name-display"></span>
+          <button id="change-name-btn" class="btn btn-ghost btn-sm" type="button">이름 변경</button>
+        </div>
+
+      </div>
+      <!-- /vote-content -->
+
+    </div>
+  </main>
+
+  <!-- ── 플로팅 툴팁 ── -->
+  <div id="cal-tooltip" class="cal-tooltip" role="tooltip" aria-hidden="true"></div>
+
+  <!-- ── Scripts ── -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/vote.js"></script>
+</body>
+</html>

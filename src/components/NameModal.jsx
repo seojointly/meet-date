@@ -1,0 +1,131 @@
+import { useState, useEffect, useRef } from 'react'
+import { Users } from 'lucide-react'
+import { MAX_PARTICIPANTS } from '../hooks/useParticipants'
+
+export default function NameModal({ isOpen, participants, onSubmit }) {
+  const [name, setName]       = useState('')
+  const [error, setError]     = useState('')
+  const [loading, setLoading] = useState(false)
+  const inputRef = useRef(null)
+  const isFull = participants.length >= MAX_PARTICIPANTS
+
+  useEffect(() => {
+    if (isOpen) {
+      setName('')
+      setError('')
+      setLoading(false)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [isOpen])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) { setError('이름을 입력해주세요'); return }
+    if (participants.some(p => p.name === trimmed)) {
+      setError('이미 사용 중인 이름입니다')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await onSubmit(trimmed)
+    } catch (err) {
+      setError(err.message ?? '오류가 발생했습니다')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 bg-black/40 z-[60] transition-opacity duration-300 ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      />
+
+      {/* Sheet — 모바일: 하단 bottom sheet / md+: 중앙 모달 */}
+      <div
+        className={[
+          'fixed z-[70] bg-white shadow-2xl',
+          'bottom-0 left-0 right-0 rounded-t-2xl',
+          'md:top-1/2 md:left-1/2 md:bottom-auto md:right-auto',
+          'md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:w-96',
+          'p-6 transition-all duration-300',
+          isOpen
+            ? 'translate-y-0 opacity-100'
+            : 'translate-y-full opacity-0 md:translate-y-[-40%] pointer-events-none',
+        ].join(' ')}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="name-modal-title"
+      >
+        {/* Mobile drag handle */}
+        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5 md:hidden" />
+
+        <div className="flex items-center gap-2 mb-1">
+          <Users size={20} className="text-green-500" />
+          <h2 id="name-modal-title" className="text-lg font-bold">참여자 이름 입력</h2>
+        </div>
+        <p className="text-sm text-gray-500 mb-5">이름은 투표 결과에 표시됩니다.</p>
+
+        {isFull ? (
+          <div className="text-center py-6 space-y-2">
+            <p className="text-3xl">🙅</p>
+            <p className="font-semibold text-gray-800">
+              정원이 가득 찼습니다 ({MAX_PARTICIPANTS}/{MAX_PARTICIPANTS})
+            </p>
+            <p className="text-sm text-gray-500">이 방에는 더 이상 참여할 수 없어요.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} noValidate>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              이름 <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={inputRef}
+              type="text"
+              value={name}
+              onChange={e => { setName(e.target.value); setError('') }}
+              placeholder="예) 홍길동"
+              maxLength={20}
+              autoComplete="off"
+              className={[
+                'w-full px-3 py-2.5 border rounded-xl text-sm',
+                'focus:outline-none focus:ring-2 focus:ring-green-500',
+                error ? 'border-red-400 bg-red-50' : 'border-gray-300',
+              ].join(' ')}
+            />
+            {error && (
+              <p className="text-red-500 text-xs mt-1.5">{error}</p>
+            )}
+
+            {participants.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {participants.map(p => (
+                  <span
+                    key={p.id}
+                    className="text-xs px-2 py-0.5 rounded-full text-white"
+                    style={{ backgroundColor: p.color }}
+                  >
+                    {p.name}
+                  </span>
+                ))}
+                <span className="text-xs text-gray-400">이미 참여 중</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-5 w-full bg-green-500 text-white py-3 min-h-[48px] rounded-xl font-semibold hover:bg-green-600 active:bg-green-700 active:scale-95 disabled:opacity-60 transition-all focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+            >
+              {loading ? '참여 중…' : '투표 시작하기'}
+            </button>
+          </form>
+        )}
+      </div>
+    </>
+  )
+}

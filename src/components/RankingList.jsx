@@ -1,0 +1,126 @@
+import { useMemo } from 'react'
+import { CheckCircle, RefreshCw } from 'lucide-react'
+
+function formatDateLong(str) {
+  if (!str) return ''
+  const [y, m, d] = str.split('-').map(Number)
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  return `${m}월 ${d}일 ${days[new Date(y, m - 1, d).getDay()]}요일`
+}
+
+const MEDAL = ['🥇', '🥈', '🥉']
+
+export default function RankingList({
+  allowedDates,     // Set<string>
+  availabilities,   // [{participant_id, dates, participants:{name,color}}]
+  participants,     // [{id, name, color}]
+  confirmedDate,    // string | null
+  onConfirm,        // (date: string) => void
+  onCancel,         // () => void
+}) {
+  const ranked = useMemo(() => {
+    if (!allowedDates) return []
+    const countMap = new Map()
+    allowedDates.forEach(d => countMap.set(d, []))
+
+    availabilities.forEach(a => {
+      const p = a.participants
+      if (!p) return
+      ;(a.dates ?? []).forEach(d => {
+        if (countMap.has(d)) countMap.get(d).push({ name: p.name, color: p.color })
+      })
+    })
+
+    return [...countMap.entries()]
+      .filter(([, voters]) => voters.length > 0)
+      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+  }, [allowedDates, availabilities])
+
+  const total = participants.length
+
+  if (total === 0) {
+    return <p className="text-sm text-gray-400 text-center py-4">아직 참여자가 없어요.</p>
+  }
+
+  if (ranked.length === 0) {
+    return <p className="text-sm text-gray-400 text-center py-4">아직 투표한 사람이 없어요.</p>
+  }
+
+  let rankNum = 1
+  const items = ranked.map(([date, voters], i) => {
+    if (i > 0 && voters.length < ranked[i - 1][1].length) rankNum = i + 1
+    const curRank      = rankNum
+    const isConfirmed  = date === confirmedDate
+    const allAvailable = voters.length === total && total > 0
+    return { date, voters, curRank, isConfirmed, allAvailable }
+  })
+
+  return (
+    <div className="space-y-2">
+      {items.map(({ date, voters, curRank, isConfirmed, allAvailable }) => (
+        <div
+          key={date}
+          className={[
+            'flex items-center gap-3 p-4 rounded-xl border transition-all duration-300',
+            isConfirmed
+              ? 'border-green-300 bg-green-50'
+              : allAvailable
+                ? 'border-green-200 bg-green-50 animate-rank-pulse'
+                : 'border-gray-100 bg-white',
+          ].join(' ')}
+        >
+          {/* rank badge */}
+          <span className="text-xl shrink-0 w-7 text-center">
+            {curRank <= 3
+              ? MEDAL[curRank - 1]
+              : <span className="text-sm text-gray-500">{curRank}</span>}
+          </span>
+
+          {/* date + voters */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 truncate">{formatDateLong(date)}</p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {voters.map(v => (
+                <span
+                  key={v.name}
+                  className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium"
+                  style={{ backgroundColor: v.color }}
+                >
+                  {v.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* count + action */}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <span className="text-xs font-bold text-gray-600">
+              {voters.length}/{total}명
+            </span>
+            {isConfirmed ? (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">
+                <CheckCircle size={12} />
+                확정됨
+              </span>
+            ) : confirmedDate ? (
+              <button
+                onClick={() => onConfirm(date)}
+                className="text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 active:scale-95 px-2.5 py-1 rounded-full transition-all flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-1"
+              >
+                <RefreshCw size={11} />
+                재확정
+              </button>
+            ) : (
+              <button
+                onClick={() => onConfirm(date)}
+                className="text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 active:scale-95 px-2.5 py-1 rounded-full transition-all focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1"
+              >
+                이 날로 확정
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
