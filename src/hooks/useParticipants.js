@@ -32,14 +32,37 @@ export function useParticipants(roomId) {
       try {
         const stored = localStorage.getItem(storageKey(roomId))
         if (stored) {
-          const { id } = JSON.parse(stored)
+          const { id, name, pin } = JSON.parse(stored)
+          const storedPin = pin ?? null
+
+          // 1. id로 복원 시도
           const { data, error } = await supabase
             .from('participants')
             .select('id')
             .eq('id', id)
             .maybeSingle()
+
           if (!error && data) {
             setParticipantId(id)
+          } else if (name) {
+            // 2. name + room_id로 복원 시도
+            const { data: nameData, error: nameError } = await supabase
+              .from('participants')
+              .select('id, pin')
+              .eq('room_id', roomId)
+              .eq('name', name)
+              .maybeSingle()
+
+            if (!nameError && nameData) {
+              if (nameData.pin === null || nameData.pin === storedPin) {
+                setParticipantId(nameData.id)
+                localStorage.setItem(storageKey(roomId), JSON.stringify({ id: nameData.id, name, pin: storedPin }))
+              } else {
+                localStorage.removeItem(storageKey(roomId))
+              }
+            } else {
+              localStorage.removeItem(storageKey(roomId))
+            }
           } else {
             localStorage.removeItem(storageKey(roomId))
           }
@@ -71,20 +94,39 @@ export function useParticipants(roomId) {
     return () => { supabase.removeChannel(ch) }
   }, [roomId, fetchParticipants])
 
-  const registerParticipant = useCallback(async (name, maxParticipants) => {
+  const registerParticipant = useCallback(async (name, maxParticipants, pin = null) => {
+    const existing = participants.find(p => p.name === name)
+
+    if (existing) {
+      // 재입장: PIN 검증
+      const { data: pData, error: pError } = await supabase
+        .from('participants')
+        .select('id, pin')
+        .eq('id', existing.id)
+        .single()
+      if (pError) throw pError
+
+      if (pData.pin !== null && pData.pin !== pin) {
+        throw Object.assign(new Error('PIN이 올바르지 않아요'), { code: 'WRONG_PIN' })
+      }
+
+      localStorage.setItem(storageKey(roomId), JSON.stringify({ id: existing.id, name, pin: pin ?? null }))
+      setParticipantId(existing.id)
+      return existing
+    }
+
+    // 신규 참여자
     if (participants.length >= maxParticipants) {
       throw Object.assign(
         new Error(`정원이 가득 찼습니다 (${participants.length}/${maxParticipants})`),
         { code: 'FULL' }
       )
     }
-    if (participants.some(p => p.name === name)) {
-      throw Object.assign(new Error('이미 사용 중인 이름입니다'), { code: 'DUPLICATE' })
-    }
+
     const color = PARTICIPANT_COLORS[participants.length % PARTICIPANT_COLORS.length]
     const { data, error } = await supabase
       .from('participants')
-      .insert({ room_id: roomId, name, color })
+      .insert({ room_id: roomId, name, color, pin: pin || null })
       .select('*')
       .single()
     if (error) {
@@ -93,7 +135,7 @@ export function useParticipants(roomId) {
       }
       throw error
     }
-    localStorage.setItem(storageKey(roomId), JSON.stringify({ id: data.id, name: data.name }))
+    localStorage.setItem(storageKey(roomId), JSON.stringify({ id: data.id, name: data.name, pin: pin ?? null }))
     setParticipantId(data.id)
     await fetchParticipants()
     return data

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+const HEAT_COLORS = ['', '#bbf7d0', '#86efac', '#4ade80', '#22c55e', '#16a34a']
+
 export default function HeatmapCell({
   day,
   dateStr,
@@ -8,29 +10,28 @@ export default function HeatmapCell({
   isPast,
   isAllowed,
   isMySelection,
+  isDragPreview,
+  isEditMode,
+  isConfirmed,
   rangeClass,
   mode,
-  heatData,   // { voters: [{name,color}], allAvailable: boolean } | null
+  heatData,
   onHoverIn,
   onHoverOut,
   onClick,
+  onKeyboardActivate,
 }) {
   const [tip, setTip] = useState(false)
   const disabled = isPast || (mode === 'multi' && !isAllowed)
 
   // ── heatmap background (multi mode only) ────────────────────────
   let bgStyle = {}
-  if (mode === 'multi' && heatData?.voters.length > 0) {
-    const vs = heatData.voters
-    if (vs.length === 1) {
-      bgStyle = { backgroundColor: vs[0].color + 'aa' }
-    } else {
-      const pct = 100 / vs.length
-      const stops = vs.flatMap((v, i) => [
-        `${v.color}aa ${(i * pct).toFixed(1)}%`,
-        `${v.color}aa ${((i + 1) * pct).toFixed(1)}%`,
-      ])
-      bgStyle = { background: `linear-gradient(to bottom, ${stops.join(', ')})` }
+  if (mode === 'multi') {
+    if (isEditMode && isMySelection) {
+      bgStyle = { backgroundColor: '#bae6fd' }
+    } else if (heatData?.voters.length > 0) {
+      const idx = Math.min(heatData.voters.length, HEAT_COLORS.length - 1)
+      bgStyle = { backgroundColor: HEAT_COLORS[idx] }
     }
   }
 
@@ -53,7 +54,7 @@ export default function HeatmapCell({
   const base = [
     'relative flex items-center justify-center rounded-lg',
     'text-sm font-medium select-none',
-    'min-h-[44px] min-w-[44px]',   // 44px touch target
+    'min-h-[44px] min-w-[44px]',
     'transition-all duration-150',
   ]
 
@@ -62,7 +63,7 @@ export default function HeatmapCell({
     if (!isAllowed && mode === 'multi') base.push('text-gray-300')
   } else {
     base.push('cursor-pointer')
-    if (!rangeBg && !bgStyle.background && !bgStyle.backgroundColor) {
+    if (!rangeBg && !bgStyle.backgroundColor) {
       base.push('hover:bg-gray-100 active:bg-gray-200')
     }
   }
@@ -74,12 +75,13 @@ export default function HeatmapCell({
 
   if (isToday && !rangeBg) base.push('ring-1 ring-inset ring-green-400 font-bold')
 
-  if (isMySelection && mode === 'multi') {
+  // ring priority: drag preview > edit mode selection > normal selection
+  if (isDragPreview) {
+    base.push('ring-2 ring-green-400 ring-inset')
+  } else if (isEditMode && isMySelection && mode === 'multi') {
+    base.push('ring-2 ring-offset-1 ring-sky-400')
+  } else if (isMySelection && mode === 'multi') {
     base.push('ring-2 ring-offset-1 ring-green-600')
-  }
-
-  if (heatData?.allAvailable && mode === 'multi') {
-    base.push('animate-rank-pulse')
   }
 
   if (rangeBg) base.push(rangeBg, rangeText)
@@ -89,17 +91,28 @@ export default function HeatmapCell({
       <div
         className={base.join(' ')}
         style={rangeBg ? {} : bgStyle}
+        data-date={dateStr}
+        data-disabled={disabled || undefined}
         role={disabled ? undefined : 'button'}
         tabIndex={disabled ? -1 : 0}
         aria-label={dateStr}
         aria-pressed={isMySelection}
         onClick={disabled ? undefined : onClick}
-        onKeyDown={e => { if (!disabled && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick?.() } }}
+        onKeyDown={e => {
+          if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            onClick?.()
+            onKeyboardActivate?.()
+          }
+        }}
         onMouseEnter={() => { onHoverIn?.(dateStr); if (heatData?.voters.length) setTip(true) }}
         onMouseLeave={() => { onHoverOut?.(); setTip(false) }}
         onTouchStart={() => { if (heatData?.voters.length) setTip(t => !t) }}
       >
         {day}
+        {isConfirmed && (
+          <span className="absolute top-0.5 right-0.5 text-[10px] leading-none pointer-events-none">⭐</span>
+        )}
       </div>
 
       {tip && heatData?.voters.length > 0 && (

@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import Calendar from '../components/Calendar'
 
+const MAX_LIMIT = 10
+
 function formatDate(str) {
   if (!str) return '—'
   const [y, m, d] = str.split('-').map(Number)
@@ -46,12 +48,12 @@ function Stepper({ label, value, min, max, onChange }) {
 export default function HomePage() {
   const navigate = useNavigate()
   const showToast = useToast()
-  const [modalOpen, setModalOpen]           = useState(false)
-  const [rangeFrom, setRangeFrom]           = useState(null)
-  const [rangeTo, setRangeTo]               = useState(null)
-  const [creating, setCreating]             = useState(false)
-  const [minParticipants, setMinParticipants] = useState(2)
+  const [modalOpen, setModalOpen]             = useState(false)
+  const [title, setTitle]                     = useState('')
+  const [rangeFrom, setRangeFrom]             = useState(null)
+  const [rangeTo, setRangeTo]                 = useState(null)
   const [maxParticipants, setMaxParticipants] = useState(4)
+  const [creating, setCreating]               = useState(false)
 
   function handleRangeChange(from, to) {
     setRangeFrom(from)
@@ -59,26 +61,15 @@ export default function HomePage() {
   }
 
   function openModal() {
+    setTitle('')
     setRangeFrom(null)
     setRangeTo(null)
-    setMinParticipants(2)
     setMaxParticipants(4)
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
-  }
-
-  function handleMinChange(val) {
-    setMinParticipants(val)
-    if (val >= maxParticipants) {
-      setMaxParticipants(Math.min(val + 1, 8))
-    }
-  }
-
-  function handleMaxChange(val) {
-    setMaxParticipants(val)
   }
 
   async function handleCreate() {
@@ -88,9 +79,9 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from('rooms')
         .insert({
+          title: title.trim() || '모임',
           date_from: rangeFrom,
           date_to: rangeTo,
-          min_participants: minParticipants,
           max_participants: maxParticipants,
         })
         .select('id')
@@ -160,7 +151,7 @@ export default function HomePage() {
             {/* Modal header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto md:hidden absolute top-3 left-1/2 -translate-x-1/2" />
-              <h2 className="font-bold text-gray-800">날짜 범위 선택</h2>
+              <h2 className="font-bold text-gray-800">방 만들기</h2>
               <button
                 onClick={closeModal}
                 className="p-2 min-h-[40px] min-w-[40px] rounded-lg hover:bg-gray-100 active:bg-gray-200 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-gray-400"
@@ -171,50 +162,58 @@ export default function HomePage() {
             </div>
 
             {/* Modal body */}
-            <div className="px-5 py-4">
-              <p className="text-sm text-center text-gray-500 mb-4">
-                {!rangeFrom
-                  ? '시작 날짜를 선택하세요'
-                  : !rangeTo
-                    ? '종료 날짜를 선택하세요'
-                    : <span className="text-green-600 font-medium">날짜 범위가 선택됐어요 ✓</span>
-                }
-              </p>
+            <div className="px-5 py-4 space-y-5">
+              {/* 방 이름 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">방 이름</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="예) 5월 MT, 생일 파티"
+                  maxLength={20}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
 
-              <Calendar
-                mode="range"
-                rangeFrom={rangeFrom}
-                rangeTo={rangeTo}
-                onRangeChange={handleRangeChange}
-              />
+              {/* 날짜 선택 */}
+              <div>
+                <p className="text-sm text-center text-gray-500 mb-4">
+                  {!rangeFrom
+                    ? '시작 날짜를 선택하세요'
+                    : !rangeTo
+                      ? '종료 날짜를 선택하세요'
+                      : <span className="text-green-600 font-medium">날짜 범위가 선택됐어요 ✓</span>
+                  }
+                </p>
 
-              {rangeReady && (
-                <div className="mt-4 flex items-center justify-center gap-3 bg-green-50 rounded-xl px-4 py-3">
-                  <span className="text-sm font-semibold text-green-800">{formatDate(rangeFrom)}</span>
-                  <ArrowRight size={16} className="text-green-500" />
-                  <span className="text-sm font-semibold text-green-800">{formatDate(rangeTo)}</span>
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                    {diff === 0 ? '당일' : `${diff}일 간`}
-                  </span>
-                </div>
-              )}
+                <Calendar
+                  mode="range"
+                  rangeFrom={rangeFrom}
+                  rangeTo={rangeTo}
+                  onRangeChange={handleRangeChange}
+                />
+
+                {rangeReady && (
+                  <div className="mt-4 flex items-center justify-center gap-3 bg-green-50 rounded-xl px-4 py-3">
+                    <span className="text-sm font-semibold text-green-800">{formatDate(rangeFrom)}</span>
+                    <ArrowRight size={16} className="text-green-500" />
+                    <span className="text-sm font-semibold text-green-800">{formatDate(rangeTo)}</span>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                      {diff === 0 ? '당일' : `${diff}일 간`}
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {/* 인원 설정 */}
-              <div className="mt-5 space-y-3">
-                <p className="text-sm font-semibold text-gray-700">참여 인원 설정</p>
-                <Stepper
-                  label="최소 참여 인원"
-                  value={minParticipants}
-                  min={1}
-                  max={8}
-                  onChange={handleMinChange}
-                />
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
                 <Stepper
                   label="최대 참여 인원"
                   value={maxParticipants}
-                  min={minParticipants + 1}
-                  max={8}
-                  onChange={handleMaxChange}
+                  min={2}
+                  max={MAX_LIMIT}
+                  onChange={setMaxParticipants}
                 />
               </div>
             </div>

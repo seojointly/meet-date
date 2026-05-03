@@ -15,15 +15,10 @@ export default {
           '0%': { transform: 'translateY(100%)' },
           '100%': { transform: 'translateY(0)' },
         },
-        rankPulse: {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(34, 197, 94, 0.4)' },
-          '50%': { boxShadow: '0 0 0 6px rgba(34, 197, 94, 0)' },
-        },
       },
       animation: {
         'fade-in-up': 'fadeInUp 0.25s ease-out both',
         'slide-up': 'slideUp 0.3s ease-out both',
-        'rank-pulse': 'rankPulse 2s ease-in-out infinite',
       },
     },
   },

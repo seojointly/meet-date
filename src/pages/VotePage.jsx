@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { CalendarDays, WifiOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
@@ -10,6 +10,7 @@ import Calendar from '../components/Calendar'
 import RankingList from '../components/RankingList'
 import ParticipantBar from '../components/ParticipantBar'
 import ConfirmedBanner from '../components/ConfirmedBanner'
+import ConfirmedModal from '../components/ConfirmedModal'
 import NameModal from '../components/NameModal'
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -65,16 +66,19 @@ function ConnectionBanner({ status }) {
 // ── VotePage ─────────────────────────────────────────────────────
 export default function VotePage() {
   const { roomId } = useParams()
+  const navigate   = useNavigate()
   const showToast  = useToast()
 
   const [room, setRoom]               = useState(null)
   const [roomLoading, setRoomLoading] = useState(true)
   const [roomError, setRoomError]     = useState(null)
 
-  const [showNameModal, setShowNameModal] = useState(false)
-  const [selectedDates, setSelectedDates] = useState(new Set())
-  const [initDates, setInitDates]         = useState(false)
-  const [saving, setSaving]               = useState(false)
+  const [showNameModal, setShowNameModal]       = useState(false)
+  const [showConfirmedModal, setShowConfirmedModal] = useState(false)
+  const [selectedDates, setSelectedDates]       = useState(new Set())
+  const [initDates, setInitDates]               = useState(false)
+  const [saving, setSaving]                     = useState(false)
+  const [isEditMode, setIsEditMode]             = useState(true)
 
   const {
     participants,
@@ -105,8 +109,7 @@ export default function VotePage() {
           setRoomError('존재하지 않는 방입니다.')
         } else {
           setRoom(data)
-          const month = parseInt(data.date_from.split('-')[1])
-          document.title = `${month}월 모임 날짜 투표 | 날짜 맞춰`
+          document.title = `${data.title || '모임'} 날짜 투표 | 날짜 맞춰`
         }
         setRoomLoading(false)
       })
@@ -123,6 +126,7 @@ export default function VotePage() {
     if (initDates || vLoading || !participantId) return
     const my = availabilities.find(a => a.participant_id === participantId)
     setSelectedDates(new Set(my?.dates ?? []))
+    setIsEditMode(!(my?.dates?.length > 0))
     setInitDates(true)
   }, [vLoading, participantId, availabilities, initDates])
 
@@ -138,14 +142,20 @@ export default function VotePage() {
   )
 
   const maxParticipants = room?.max_participants ?? 4
-  const minParticipants = room?.min_participants ?? 2
+
+  // 이미 투표 제출 여부
+  const hasSubmitted = !!(
+    participantId &&
+    (availabilities.find(a => a.participant_id === participantId)?.dates?.length ?? 0) > 0
+  )
 
   // ── 핸들러 ─────────────────────────────────────────────────────
-  async function handleRegister(name) {
-    await registerParticipant(name, maxParticipants)
+  async function handleRegister(name, pin) {
+    const wasExisting = participants.some(p => p.name === name)
+    await registerParticipant(name, maxParticipants, pin)
     setInitDates(false)
     setShowNameModal(false)
-    showToast(`${name}으로 참여했어요!`, 'success')
+    showToast(wasExisting ? `${name}으로 재입장했어요!` : `${name}으로 참여했어요! 🎉`, 'success')
   }
 
   function handleDateToggle(dateStr) {
@@ -166,6 +176,7 @@ export default function VotePage() {
     try {
       await saveVotes(participantId, [...selectedDates].sort())
       showToast('투표가 저장됐어요! 🎉', 'success')
+      setIsEditMode(false)
     } catch {
       showToast('저장에 실패했어요. 다시 시도해주세요.', 'error')
     } finally {
@@ -179,6 +190,7 @@ export default function VotePage() {
       const [y, m, d] = date.split('-').map(Number)
       const days = ['일','월','화','수','목','금','토']
       showToast(`${m}월 ${d}일 ${days[new Date(y,m-1,d).getDay()]}요일로 확정됐어요! 🎉`, 'success')
+      setShowConfirmedModal(true)
     } catch {
       showToast('확정에 실패했어요.', 'error')
     }
@@ -241,22 +253,31 @@ export default function VotePage() {
               날짜 맞춰
             </Link>
             {room && (
-              <span className="text-xs text-gray-400 ml-2">
-                {formatDateMedium(room.date_from)} ~ {formatDateMedium(room.date_to)}
+              <span className="text-xs text-gray-400 ml-2 truncate">
+                {room.title} | {formatDateMedium(room.date_from)} ~ {formatDateMedium(room.date_to)}
               </span>
             )}
-            {myName && (
-              <span className="ml-auto text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                {myName}
-              </span>
-            )}
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              {confirmedDate && (
+                <button
+                  onClick={() => navigate(`/confirmed/${roomId}`)}
+                  className="text-xs font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 active:scale-95 px-2.5 py-1.5 rounded-full transition-all"
+                >
+                  ⭐ 확정 페이지
+                </button>
+              )}
+              {myName && (
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                  {myName}
+                </span>
+              )}
+            </div>
           </div>
         </header>
       </div>
 
       {/* 메인 컨텐츠 */}
       <main className="max-w-5xl mx-auto px-4 py-5">
-        {/* 모바일: 단일 컬럼 / PC(lg+): 60%-40% 2컬럼 */}
         <div className="lg:grid lg:grid-cols-[60%_40%] lg:gap-6">
 
           {/* ── 좌: 캘린더 카드 ── */}
@@ -292,25 +313,34 @@ export default function VotePage() {
                 allowedDates={allowedDates}
                 selectedDates={selectedDates}
                 onDateToggle={handleDateToggle}
-                heatmapData={heatmapData}
+                heatmapData={hasSubmitted ? heatmapData : null}
+                isEditMode={isEditMode}
+                confirmedDate={confirmedDate}
               />
 
-              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 flex-wrap">
-                <span className="text-xs text-gray-400">투표 인원</span>
-                <span className="text-xs text-gray-400">적음</span>
-                {['#bbf7d0','#86efac','#4ade80','#16a34a','#14532d'].map((c, i) => (
-                  <span key={i} className="w-4 h-4 rounded" style={{ backgroundColor: c }} />
-                ))}
-                <span className="text-xs text-gray-400">많음</span>
-              </div>
+              {hasSubmitted && (
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 flex-wrap">
+                  <span className="text-xs text-gray-400">투표 인원</span>
+                  <span className="text-xs text-gray-400">적음</span>
+                  {['#bbf7d0','#86efac','#4ade80','#22c55e','#16a34a'].map((c, i) => (
+                    <span key={i} className="w-4 h-4 rounded" style={{ backgroundColor: c }} />
+                  ))}
+                  <span className="text-xs text-gray-400">많음</span>
+                </div>
+              )}
 
               <button
-                onClick={handleSaveVotes}
+                onClick={hasSubmitted && !isEditMode ? () => setIsEditMode(true) : handleSaveVotes}
                 disabled={saving || !participantId}
                 className="mt-4 w-full bg-green-500 text-white py-3 min-h-[48px] rounded-xl font-bold hover:bg-green-600 active:bg-green-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
               >
-                {saving ? '저장 중…' : '투표 저장'}
+                {saving ? '저장 중…' : hasSubmitted && !isEditMode ? '날짜 변경' : hasSubmitted ? '변경 저장' : '투표하기'}
               </button>
+              {hasSubmitted && (
+                <p className="mt-1.5 text-xs text-center text-gray-400">
+                  날짜를 다시 선택하고 저장하면 업데이트돼요
+                </p>
+              )}
             </div>
           </div>
 
@@ -332,7 +362,6 @@ export default function VotePage() {
                 confirmedDate={confirmedDate}
                 onConfirm={handleConfirm}
                 onCancel={handleCancelAppointment}
-                minParticipants={minParticipants}
                 maxParticipants={maxParticipants}
               />
             </div>
@@ -345,6 +374,13 @@ export default function VotePage() {
         participants={participants}
         maxParticipants={maxParticipants}
         onSubmit={handleRegister}
+      />
+
+      <ConfirmedModal
+        isOpen={showConfirmedModal}
+        confirmedDate={confirmedDate}
+        roomId={roomId}
+        onClose={() => setShowConfirmedModal(false)}
       />
     </div>
   )

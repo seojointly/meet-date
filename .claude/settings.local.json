@@ -6,7 +6,8 @@
       "Bash(curl -s http://localhost:5173)",
       "PowerShell(Start-Process \"http://localhost:5173\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\Desktop\\\\001.IT\\\\001.VibeCoding\\\\003. 모임일자앱\" -Recurse -File)",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(findstr \"scripts\" /A:5)"
     ]
   }
 }

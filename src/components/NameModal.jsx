@@ -2,15 +2,22 @@ import { useState, useEffect, useRef } from 'react'
 import { Users } from 'lucide-react'
 
 export default function NameModal({ isOpen, participants, maxParticipants, onSubmit }) {
-  const [name, setName]       = useState('')
-  const [error, setError]     = useState('')
-  const [loading, setLoading] = useState(false)
+  const [name, setName]         = useState('')
+  const [pin, setPin]           = useState('')
+  const [pinError, setPinError] = useState('')
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
   const inputRef = useRef(null)
-  const isFull = participants.length >= maxParticipants
+
+  const trimmedName = name.trim()
+  const isExisting  = !!trimmedName && participants.some(p => p.name === trimmedName)
+  const isFull      = participants.length >= maxParticipants
 
   useEffect(() => {
     if (isOpen) {
       setName('')
+      setPin('')
+      setPinError('')
       setError('')
       setLoading(false)
       setTimeout(() => inputRef.current?.focus(), 100)
@@ -19,18 +26,20 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
 
   async function handleSubmit(e) {
     e.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) { setError('이름을 입력해주세요'); return }
-    if (participants.some(p => p.name === trimmed)) {
-      setError('이미 사용 중인 이름입니다')
-      return
-    }
+    if (!trimmedName) { setError('이름을 입력해주세요'); return }
+    if (pin && !/^\d{4}$/.test(pin)) { setPinError('숫자 4자리를 입력해주세요'); return }
+
     setLoading(true)
     setError('')
+    setPinError('')
     try {
-      await onSubmit(trimmed)
+      await onSubmit(trimmedName, pin || null)
     } catch (err) {
-      setError(err.message ?? '오류가 발생했습니다')
+      if (err.code === 'WRONG_PIN') {
+        setPinError(err.message)
+      } else {
+        setError(err.message ?? '오류가 발생했습니다')
+      }
       setLoading(false)
     }
   }
@@ -66,7 +75,7 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
         </div>
         <p className="text-sm text-gray-500 mb-5">이름은 투표 결과에 표시됩니다.</p>
 
-        {isFull ? (
+        {isFull && !isExisting ? (
           <div className="text-center py-6 space-y-2">
             <p className="text-3xl">🙅</p>
             <p className="font-semibold text-gray-800">
@@ -76,6 +85,7 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate>
+            {/* 이름 입력 */}
             <label className="block text-sm font-medium text-gray-700 mb-1">
               이름 <span className="text-red-500">*</span>
             </label>
@@ -83,7 +93,7 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
               ref={inputRef}
               type="text"
               value={name}
-              onChange={e => { setName(e.target.value); setError('') }}
+              onChange={e => { setName(e.target.value); setError(''); setPinError('') }}
               placeholder="예) 홍길동"
               maxLength={20}
               autoComplete="off"
@@ -93,11 +103,57 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
                 error ? 'border-red-400 bg-red-50' : 'border-gray-300',
               ].join(' ')}
             />
-            {error && (
-              <p className="text-red-500 text-xs mt-1.5">{error}</p>
+            {error && <p className="text-red-500 text-xs mt-1.5">{error}</p>}
+
+            {/* 케이스 B — 기존 참여자 재입장 */}
+            {isExisting && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+                <p className="text-sm text-yellow-800 mb-2">
+                  이미 있는 이름이에요. PIN을 입력하면 재입장할 수 있어요
+                </p>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={pin}
+                  onChange={e => { setPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError('') }}
+                  placeholder="숫자 4자리 (PIN 없으면 빈칸)"
+                  maxLength={4}
+                  className={[
+                    'w-full px-3 py-2.5 border rounded-xl text-sm',
+                    'focus:outline-none focus:ring-2 focus:ring-yellow-400',
+                    pinError ? 'border-red-400 bg-red-50' : 'border-yellow-300',
+                  ].join(' ')}
+                />
+                {pinError && <p className="text-red-500 text-xs mt-1.5">{pinError}</p>}
+              </div>
             )}
 
-            {participants.length > 0 && (
+            {/* 케이스 A — 새 참여자 선택적 PIN 설정 */}
+            {!isExisting && trimmedName && (
+              <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                <p className="text-xs font-medium text-gray-600 mb-0.5">PIN 설정 (선택)</p>
+                <p className="text-xs text-gray-400 mb-2">
+                  PIN을 설정하면 다음에 같은 이름으로 재입장할 수 있어요
+                </p>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={pin}
+                  onChange={e => { setPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError('') }}
+                  placeholder="숫자 4자리 (선택사항)"
+                  maxLength={4}
+                  className={[
+                    'w-full px-3 py-2.5 border rounded-xl text-sm',
+                    'focus:outline-none focus:ring-2 focus:ring-green-500',
+                    pinError ? 'border-red-400 bg-red-50' : 'border-gray-300',
+                  ].join(' ')}
+                />
+                {pinError && <p className="text-red-500 text-xs mt-1.5">{pinError}</p>}
+              </div>
+            )}
+
+            {/* 기존 참여자 배지 */}
+            {!isExisting && participants.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {participants.map(p => (
                   <span
@@ -117,7 +173,7 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
               disabled={loading}
               className="mt-5 w-full bg-green-500 text-white py-3 min-h-[48px] rounded-xl font-semibold hover:bg-green-600 active:bg-green-700 active:scale-95 disabled:opacity-60 transition-all focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
             >
-              {loading ? '참여 중…' : '투표 시작하기'}
+              {loading ? '처리 중…' : isExisting ? '재입장하기' : '투표 시작하기'}
             </button>
           </form>
         )}

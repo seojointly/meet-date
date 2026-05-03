@@ -16,17 +16,16 @@ export function useAppointment(roomId) {
     setLoading(false)
   }, [roomId])
 
-  useEffect(() => {
-    fetchAppointment()
-  }, [fetchAppointment])
+  useEffect(() => { fetchAppointment() }, [fetchAppointment])
 
   useEffect(() => {
     if (!roomId) return
     const ch = supabase
       .channel(`appt-${roomId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `room_id=eq.${roomId}` },
-        () => fetchAppointment()
-      )
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'appointments',
+        filter: `room_id=eq.${roomId}`,
+      }, () => fetchAppointment())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [roomId, fetchAppointment])
@@ -48,5 +47,14 @@ export function useAppointment(roomId) {
     setAppointment(null)
   }, [roomId])
 
-  return { appointment, loading, confirmDate, cancelAppointment }
+  const saveMemo = useCallback(async (memo) => {
+    const { error } = await supabase
+      .from('appointments')
+      .update({ memo })
+      .eq('room_id', roomId)
+    if (error) throw error
+    await fetchAppointment()
+  }, [roomId, fetchAppointment])
+
+  return { appointment, loading, confirmDate, cancelAppointment, saveMemo }
 }

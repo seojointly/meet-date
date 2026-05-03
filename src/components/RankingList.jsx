@@ -17,7 +17,6 @@ export default function RankingList({
   confirmedDate,
   onConfirm,
   onCancel,
-  minParticipants,
   maxParticipants,
 }) {
   const ranked = useMemo(() => {
@@ -54,24 +53,21 @@ export default function RankingList({
     const curRank      = rankNum
     const isConfirmed  = date === confirmedDate
     const allAvailable = voters.length >= maxParticipants
-    const minMet       = voters.length >= minParticipants && !allAvailable
-    return { date, voters, curRank, isConfirmed, allAvailable, minMet }
+    return { date, voters, curRank, isConfirmed, allAvailable }
   })
 
   return (
     <div className="space-y-2">
-      {items.map(({ date, voters, curRank, isConfirmed, allAvailable, minMet }) => (
+      {items.map(({ date, voters, curRank, isConfirmed, allAvailable }) => (
         <div
           key={date}
           className={[
             'flex items-center gap-3 p-4 rounded-xl border transition-all duration-300',
             isConfirmed
-              ? 'border-green-300 bg-green-50'
+              ? 'border-yellow-300 bg-yellow-50'
               : allAvailable
-                ? 'border-green-200 bg-green-50 animate-rank-pulse'
-                : minMet
-                  ? 'border-blue-100 bg-blue-50'
-                  : 'border-gray-100 bg-white',
+                ? 'border-green-200 bg-green-50'
+                : 'border-gray-100 bg-white',
           ].join(' ')}
         >
           <span className="text-xl shrink-0 w-7 text-center">
@@ -81,7 +77,10 @@ export default function RankingList({
           </span>
 
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-800 truncate">{formatDateLong(date)}</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {isConfirmed && <span className="mr-1">⭐</span>}
+              {formatDateLong(date)}
+            </p>
             <div className="flex flex-wrap gap-1 mt-1">
               {voters.map(v => (
                 <span
@@ -96,11 +95,6 @@ export default function RankingList({
             {allAvailable && (
               <span className="inline-block mt-1.5 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                 🎉 모두 가능!
-              </span>
-            )}
-            {minMet && (
-              <span className="inline-block mt-1.5 text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                ✅ 최소 인원 충족
               </span>
             )}
           </div>
