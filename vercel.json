@@ -2,5 +2,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "functions": {
+    "api/geo-check.js": { "runtime": "edge" }
+  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

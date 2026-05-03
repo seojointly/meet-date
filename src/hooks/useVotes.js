@@ -13,7 +13,11 @@ export function useVotes(roomId) {
       .from('availabilities')
       .select('id, participant_id, dates, participants(id, name, color)')
       .eq('room_id', roomId)
-    if (!error) setAvailabilities(data ?? [])
+    if (error) {
+      console.error('[useVotes/fetchAvailabilities]', error)
+    } else {
+      setAvailabilities(data ?? [])
+    }
     setLoading(false)
   }, [roomId])
 

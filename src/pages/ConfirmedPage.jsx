@@ -1,18 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { CalendarDays } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import { useParticipants } from '../hooks/useParticipants'
 import { useAppointment } from '../hooks/useAppointment'
 import { useParticipantTimes } from '../hooks/useParticipantTimes'
-
-function formatDateFull(str) {
-  if (!str) return ''
-  const [y, m, d] = str.split('-').map(Number)
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  return `${y}년 ${m}월 ${d}일 (${days[new Date(y, m - 1, d).getDay()]})`
-}
+import { useRoom } from '../hooks/useRoom'
+import { formatDateFull } from '../utils/date'
 
 function formatTime(timeStr) {
   if (!timeStr) return ''
@@ -27,8 +21,8 @@ export default function ConfirmedPage() {
   const navigate   = useNavigate()
   const showToast  = useToast()
 
-  const [room, setRoom]               = useState(null)
-  const [roomLoading, setRoomLoading] = useState(true)
+  const { room, roomLoading } = useRoom(roomId)
+
   const [memo, setMemo]               = useState('')
   const [savingMemo, setSavingMemo]   = useState(false)
   const [myStartTime, setMyStartTime] = useState('')
@@ -39,31 +33,29 @@ export default function ConfirmedPage() {
   const { appointment, loading: aLoading, saveMemo: saveAppointmentMemo } = useAppointment(roomId)
   const { times, saveTime } = useParticipantTimes(roomId)
 
-  // 방 로드
+  // document.title 설정
   useEffect(() => {
-    if (!roomId) return
-    supabase.from('rooms').select('*').eq('id', roomId).single()
-      .then(({ data, error }) => {
-        if (!error && data) {
-          setRoom(data)
-          document.title = `${data.title || '모임'} 확정 | 날짜 맞춰`
-        }
-        setRoomLoading(false)
-      })
-  }, [roomId])
+    if (room) {
+      document.title = `${room.title || '모임'} 확정 | 날짜 맞춰`
+    }
+  }, [room])
 
-  // 메모 동기화
+  // 메모 초기화 — 1회만 실행하여 사용자 입력 중 덮어쓰기 방지
+  const memoInitialized = useRef(false)
   useEffect(() => {
-    setMemo(appointment?.memo ?? '')
+    if (!memoInitialized.current && appointment?.memo !== undefined) {
+      setMemo(appointment.memo ?? '')
+      memoInitialized.current = true
+    }
   }, [appointment])
 
   // 내 시간 동기화
   useEffect(() => {
     if (!participantId) return
     const toHHMM = (t) => t ? t.slice(0, 5) : ''
-    const t = times.find(t => t.participant_id === participantId)
-    if (t?.start_time) setMyStartTime(toHHMM(t.start_time))
-    if (t?.end_time) setMyEndTime(toHHMM(t.end_time))
+    const pt = times.find(pt => pt.participant_id === participantId)
+    if (pt?.start_time) setMyStartTime(toHHMM(pt.start_time))
+    if (pt?.end_time) setMyEndTime(toHHMM(pt.end_time))
   }, [times, participantId])
 
   // 전원 시간 제출 여부 + 겹치는 시간 계산
@@ -89,6 +81,10 @@ export default function ConfirmedPage() {
 
   async function handleSaveTime() {
     if (!participantId || !myStartTime || !myEndTime) return
+    if (myStartTime >= myEndTime) {
+      showToast('종료 시간이 시작 시간보다 늦어야 해요', 'warning')
+      return
+    }
     setSavingTime(true)
     try {
       await saveTime(participantId, myStartTime, myEndTime)

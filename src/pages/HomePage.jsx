@@ -4,8 +4,7 @@ import { CalendarDays, X, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import Calendar from '../components/Calendar'
-
-const MAX_LIMIT = 10
+import { MAX_PARTICIPANTS_LIMIT } from '../constants/colors'
 
 function formatDate(str) {
   if (!str) return '—'
@@ -212,7 +211,7 @@ export default function HomePage() {
                   label="최대 참여 인원"
                   value={maxParticipants}
                   min={2}
-                  max={MAX_LIMIT}
+                  max={MAX_PARTICIPANTS_LIMIT}
                   onChange={setMaxParticipants}
                 />
               </div>

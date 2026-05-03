@@ -1,11 +1,5 @@
 import { CheckCircle } from 'lucide-react'
-
-function formatDateLong(str) {
-  if (!str) return ''
-  const [y, m, d] = str.split('-').map(Number)
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  return `${m}월 ${d}일 ${days[new Date(y, m - 1, d).getDay()]}요일`
-}
+import { formatDateLong } from '../utils/date'
 
 export default function ConfirmedBanner({ confirmedDate, onCancel }) {
   if (!confirmedDate) return null

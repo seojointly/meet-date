@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import HeatmapCell from './HeatmapCell'
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+import { WEEKDAYS } from '../utils/date'
+import { MAX_CALENDAR_YEAR } from '../constants/colors'
 
 function toDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -116,7 +116,7 @@ export default function Calendar({
     const minD = new Date(minStr)
     return !(year < minD.getFullYear() || (year === minD.getFullYear() && month <= minD.getMonth()))
   }
-  const canNext = () => !(year >= 2027 && month === 11)
+  const canNext = () => !(year >= MAX_CALENDAR_YEAR && month === 11)
 
   function prevMonth() {
     if (month === 0) { setYear(y => y - 1); setMonth(11) }
@@ -128,6 +128,17 @@ export default function Calendar({
   }
 
   // ── Range mode helpers ───────────────────────────────────────────
+  const handleRangeClick = useCallback((ds) => {
+    if (rangeFrom && rangeTo) { onRangeChange?.(ds, null); return }
+    if (!rangeFrom)            { onRangeChange?.(ds, null); return }
+    if (ds === rangeFrom)      { onRangeChange?.(null, null); return }
+    const lo = rangeFrom <= ds ? rangeFrom : ds
+    const hi = rangeFrom <= ds ? ds        : rangeFrom
+    onRangeChange?.(lo, hi)
+  }, [rangeFrom, rangeTo, onRangeChange])
+
+  const handleHoverOut = useCallback(() => setHover(null), [])
+
   function getRangeClass(ds) {
     if (!rangeFrom) return ''
     if (rangeFrom && rangeTo) {
@@ -145,15 +156,6 @@ export default function Calendar({
       if (ds === lo || ds === hi || (ds > lo && ds < hi)) return 'range-preview'
     }
     return ''
-  }
-
-  function handleRangeClick(ds) {
-    if (rangeFrom && rangeTo) { onRangeChange?.(ds, null); return }
-    if (!rangeFrom)            { onRangeChange?.(ds, null); return }
-    if (ds === rangeFrom)      { onRangeChange?.(null, null); return }
-    const lo = rangeFrom <= ds ? rangeFrom : ds
-    const hi = rangeFrom <= ds ? ds        : rangeFrom
-    onRangeChange?.(lo, hi)
   }
 
   // ── Build cells ──────────────────────────────────────────────────
@@ -235,7 +237,7 @@ export default function Calendar({
               mode={mode}
               heatData={heatmapData?.get(ds) ?? null}
               onHoverIn={mode === 'range' && rangeFrom && !rangeTo ? setHover : null}
-              onHoverOut={mode === 'range' && rangeFrom && !rangeTo ? () => setHover(null) : null}
+              onHoverOut={mode === 'range' && rangeFrom && !rangeTo ? handleHoverOut : null}
               onClick={mode === 'range' ? () => handleRangeClick(ds) : undefined}
               onKeyboardActivate={mode === 'multi' ? () => onDateToggle?.(ds) : undefined}
             />

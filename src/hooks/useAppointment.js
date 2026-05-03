@@ -12,7 +12,11 @@ export function useAppointment(roomId) {
       .select('*')
       .eq('room_id', roomId)
       .maybeSingle()
-    if (!error) setAppointment(data ?? null)
+    if (error) {
+      console.error('[useAppointment/fetchAppointment]', error)
+    } else {
+      setAppointment(data ?? null)
+    }
     setLoading(false)
   }, [roomId])
 

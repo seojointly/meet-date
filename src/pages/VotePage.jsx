@@ -1,38 +1,21 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { CalendarDays, WifiOff } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import { useParticipants } from '../hooks/useParticipants'
 import { useVotes } from '../hooks/useVotes'
 import { useAppointment } from '../hooks/useAppointment'
+import { useRoom } from '../hooks/useRoom'
 import Calendar from '../components/Calendar'
 import RankingList from '../components/RankingList'
 import ParticipantBar from '../components/ParticipantBar'
 import ConfirmedBanner from '../components/ConfirmedBanner'
 import ConfirmedModal from '../components/ConfirmedModal'
 import NameModal from '../components/NameModal'
+import { formatDateLong, formatDateMedium, datesInRange } from '../utils/date'
+import { HEAT_COLORS } from '../constants/colors'
 
 // ── Helpers ──────────────────────────────────────────────────────
-function datesInRange(from, to) {
-  const result = []
-  const cur = new Date(from + 'T00:00:00')
-  const end = new Date(to   + 'T00:00:00')
-  while (cur <= end) {
-    result.push(
-      `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`
-    )
-    cur.setDate(cur.getDate() + 1)
-  }
-  return result
-}
-
-function formatDateMedium(str) {
-  if (!str) return ''
-  const [, m, d] = str.split('-').map(Number)
-  return `${m}월 ${d}일`
-}
-
 function buildHeatmapData(allowedDates, availabilities, participants) {
   const map = new Map()
   const total = participants.length
@@ -69,9 +52,7 @@ export default function VotePage() {
   const navigate   = useNavigate()
   const showToast  = useToast()
 
-  const [room, setRoom]               = useState(null)
-  const [roomLoading, setRoomLoading] = useState(true)
-  const [roomError, setRoomError]     = useState(null)
+  const { room, roomLoading, roomError } = useRoom(roomId)
 
   const [showNameModal, setShowNameModal]       = useState(false)
   const [showConfirmedModal, setShowConfirmedModal] = useState(false)
@@ -91,6 +72,13 @@ export default function VotePage() {
   const { availabilities, connectionStatus, loading: vLoading, saveVotes } = useVotes(roomId)
   const { appointment, confirmDate, cancelAppointment } = useAppointment(roomId)
 
+  // document.title 설정
+  useEffect(() => {
+    if (room) {
+      document.title = `${room.title || '모임'} 날짜 투표 | 날짜 맞춰`
+    }
+  }, [room])
+
   // 재연결 토스트
   const prevStatus = useRef('connecting')
   useEffect(() => {
@@ -99,21 +87,6 @@ export default function VotePage() {
     }
     prevStatus.current = connectionStatus
   }, [connectionStatus, showToast])
-
-  // 방 로드
-  useEffect(() => {
-    if (!roomId) return
-    supabase.from('rooms').select('*').eq('id', roomId).single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          setRoomError('존재하지 않는 방입니다.')
-        } else {
-          setRoom(data)
-          document.title = `${data.title || '모임'} 날짜 투표 | 날짜 맞춰`
-        }
-        setRoomLoading(false)
-      })
-  }, [roomId])
 
   // 세션 복원 완료 후 모달 표시 여부 결정
   useEffect(() => {
@@ -187,9 +160,7 @@ export default function VotePage() {
   async function handleConfirm(date) {
     try {
       await confirmDate(date)
-      const [y, m, d] = date.split('-').map(Number)
-      const days = ['일','월','화','수','목','금','토']
-      showToast(`${m}월 ${d}일 ${days[new Date(y,m-1,d).getDay()]}요일로 확정됐어요! 🎉`, 'success')
+      showToast(`${formatDateLong(date)}로 확정됐어요! 🎉`, 'success')
       setShowConfirmedModal(true)
     } catch {
       showToast('확정에 실패했어요.', 'error')
@@ -322,7 +293,7 @@ export default function VotePage() {
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 flex-wrap">
                   <span className="text-xs text-gray-400">투표 인원</span>
                   <span className="text-xs text-gray-400">적음</span>
-                  {['#bbf7d0','#86efac','#4ade80','#22c55e','#16a34a'].map((c, i) => (
+                  {HEAT_COLORS.slice(1).map((c, i) => (
                     <span key={i} className="w-4 h-4 rounded" style={{ backgroundColor: c }} />
                   ))}
                   <span className="text-xs text-gray-400">많음</span>

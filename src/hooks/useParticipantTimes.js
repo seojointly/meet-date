@@ -11,7 +11,11 @@ export function useParticipantTimes(roomId) {
       .from('participant_times')
       .select('*, participants(id, name, color)')
       .eq('room_id', roomId)
-    if (!error) setTimes(data ?? [])
+    if (error) {
+      console.error('[useParticipantTimes/fetchTimes]', error)
+    } else {
+      setTimes(data ?? [])
+    }
     setLoading(false)
   }, [roomId])
 

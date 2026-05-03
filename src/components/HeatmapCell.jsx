@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
+import { HEAT_COLORS } from '../constants/colors'
 
-const HEAT_COLORS = ['', '#bbf7d0', '#86efac', '#4ade80', '#22c55e', '#16a34a']
-
-export default function HeatmapCell({
+function HeatmapCell({
   day,
   dateStr,
   dow,
@@ -126,3 +125,5 @@ export default function HeatmapCell({
     </div>
   )
 }
+
+export default memo(HeatmapCell)

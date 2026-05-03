@@ -1,11 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-
-function formatDateFull(str) {
-  if (!str) return ''
-  const [y, m, d] = str.split('-').map(Number)
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  return `${y}년 ${m}월 ${d}일 (${days[new Date(y, m - 1, d).getDay()]})`
-}
+import { formatDateFull } from '../utils/date'
 
 export default function ConfirmedModal({ isOpen, confirmedDate, roomId, onClose }) {
   const navigate = useNavigate()

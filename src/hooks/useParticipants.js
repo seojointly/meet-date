@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-
-export const PARTICIPANT_COLORS = [
-  '#22c55e', '#3b82f6', '#f97316', '#a855f7',
-  '#ec4899', '#f59e0b', '#06b6d4', '#8b5cf6',
-]
+import { PARTICIPANT_COLORS } from '../constants/colors'
 
 const storageKey = (roomId) => `participant_${roomId}`
+
+// pin은 클라이언트 상태에 노출하지 않음 — 검증은 별도 쿼리로 수행
+const PARTICIPANT_FIELDS = 'id, room_id, name, color, created_at'
 
 export function useParticipants(roomId) {
   const [participants, setParticipants] = useState([])
@@ -18,15 +17,21 @@ export function useParticipants(roomId) {
     if (!roomId) return
     const { data, error } = await supabase
       .from('participants')
-      .select('*')
+      .select(PARTICIPANT_FIELDS)
       .eq('room_id', roomId)
       .order('created_at')
-    if (!error) setParticipants(data ?? [])
+    if (error) {
+      console.error('[useParticipants/fetchParticipants]', error)
+    } else {
+      setParticipants(data ?? [])
+    }
     setLoading(false)
   }, [roomId])
 
   useEffect(() => {
     if (!roomId) return
+    let cancelled = false
+
     const restoreSession = async () => {
       setIsRestoringSession(true)
       try {
@@ -42,6 +47,8 @@ export function useParticipants(roomId) {
             .eq('id', id)
             .maybeSingle()
 
+          if (cancelled) return
+
           if (!error && data) {
             setParticipantId(id)
           } else if (name) {
@@ -52,6 +59,8 @@ export function useParticipants(roomId) {
               .eq('room_id', roomId)
               .eq('name', name)
               .maybeSingle()
+
+            if (cancelled) return
 
             if (!nameError && nameData) {
               if (nameData.pin === null || nameData.pin === storedPin) {
@@ -70,10 +79,12 @@ export function useParticipants(roomId) {
       } catch {
         localStorage.removeItem(storageKey(roomId))
       } finally {
-        setIsRestoringSession(false)
+        if (!cancelled) setIsRestoringSession(false)
       }
     }
+
     restoreSession()
+    return () => { cancelled = true }
   }, [roomId])
 
   useEffect(() => {
@@ -98,7 +109,7 @@ export function useParticipants(roomId) {
     const existing = participants.find(p => p.name === name)
 
     if (existing) {
-      // 재입장: PIN 검증
+      // 재입장: PIN 검증 (participants state에 pin이 없으므로 별도 조회)
       const { data: pData, error: pError } = await supabase
         .from('participants')
         .select('id, pin')
@@ -127,7 +138,7 @@ export function useParticipants(roomId) {
     const { data, error } = await supabase
       .from('participants')
       .insert({ room_id: roomId, name, color, pin: pin || null })
-      .select('*')
+      .select(PARTICIPANT_FIELDS)
       .single()
     if (error) {
       if (error.code === '23505') {
