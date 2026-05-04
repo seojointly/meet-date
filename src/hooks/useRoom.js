@@ -20,7 +20,7 @@ export function useRoom(roomId) {
 
     let cancelled = false
 
-    supabase.from('rooms').select('*').eq('id', roomId).single()
+    supabase.from('rooms').select('id, title, date_from, date_to, max_participants').eq('id', roomId).single()
       .then(({ data, error }) => {
         if (cancelled) return
         if (error || !data) {

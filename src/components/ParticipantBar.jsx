@@ -1,10 +1,15 @@
-export default function ParticipantBar({ participants, availabilities, maxParticipants }) {
+import { memo, useMemo } from 'react'
+
+function ParticipantBar({ participants, availabilities, maxParticipants }) {
   const emptySlots = Math.max(0, maxParticipants - participants.length)
 
-  function hasSubmitted(p) {
-    const avail = availabilities.find(a => a.participant_id === p.id)
-    return avail ? avail.dates.length > 0 : false
-  }
+  const submittedSet = useMemo(() => {
+    const set = new Set()
+    availabilities.forEach(a => {
+      if (a.dates?.length > 0) set.add(a.participant_id)
+    })
+    return set
+  }, [availabilities])
 
   return (
     <div className="flex items-center gap-3 flex-nowrap overflow-x-auto pb-1 scrollbar-hide">
@@ -18,7 +23,7 @@ export default function ParticipantBar({ participants, availabilities, maxPartic
               {p.name.charAt(0)}
             </div>
             <span className="absolute -bottom-0.5 -right-0.5 text-xs leading-none">
-              {hasSubmitted(p) ? '✅' : '⏳'}
+              {submittedSet.has(p.id) ? '✅' : '⏳'}
             </span>
           </div>
           <span className="text-xs text-gray-500 max-w-[36px] truncate">{p.name}</span>
@@ -40,3 +45,5 @@ export default function ParticipantBar({ participants, availabilities, maxPartic
     </div>
   )
 }
+
+export default memo(ParticipantBar)

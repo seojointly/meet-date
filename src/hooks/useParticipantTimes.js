@@ -1,16 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 export function useParticipantTimes(roomId) {
-  const [times, setTimes]   = useState([])
+  const [times, setTimes]     = useState([])
   const [loading, setLoading] = useState(true)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const fetchTimes = useCallback(async () => {
     if (!roomId) return
     const { data, error } = await supabase
       .from('participant_times')
-      .select('*, participants(id, name, color)')
+      .select('participant_id, room_id, start_time, end_time, participants(id, name, color)')
       .eq('room_id', roomId)
+    if (!mounted.current) return
     if (error) {
       console.error('[useParticipantTimes/fetchTimes]', error)
     } else {

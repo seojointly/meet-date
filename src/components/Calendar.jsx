@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import HeatmapCell from './HeatmapCell'
 import { WEEKDAYS } from '../utils/date'
@@ -9,30 +9,29 @@ function toDateStr(d) {
 }
 
 export default function Calendar({
-  mode = 'range',          // 'range' | 'multi'
+  mode = 'range',
   initialYear,
   initialMonth,
   minDate,
-  allowedDates,            // Set<string> — multi mode only
-  selectedDates,           // Set<string> — my selections (multi)
-  onDateToggle,            // (dateStr: string) => void
-  rangeFrom,               // string | null (range)
-  rangeTo,                 // string | null (range)
-  onRangeChange,           // (from: string|null, to: string|null) => void
-  heatmapData,             // Map<string, {voters:[{name,color}], allAvailable:bool}>
-  isEditMode,              // bool — show my selections in sky blue
-  confirmedDate,           // string | null — show ⭐ on confirmed cell
+  allowedDates,
+  selectedDates,
+  onDateToggle,
+  rangeFrom,
+  rangeTo,
+  onRangeChange,
+  heatmapData,
+  isEditMode,
+  confirmedDate,
 }) {
   const now = new Date()
-  const [year, setYear]         = useState(initialYear  ?? now.getFullYear())
-  const [month, setMonth]       = useState(initialMonth ?? now.getMonth())
-  const [hover, setHover]       = useState(null)
+  const [year, setYear]               = useState(initialYear  ?? now.getFullYear())
+  const [month, setMonth]             = useState(initialMonth ?? now.getMonth())
+  const [hover, setHover]             = useState(null)
   const [dragPreview, setDragPreview] = useState(new Set())
 
   const todayStr = toDateStr(now)
   const minStr   = minDate ?? todayStr
 
-  // Stable refs — update every render so handlers never have stale values
   const dragStartRef   = useRef(null)
   const dragCurrentRef = useRef(null)
   const selRef         = useRef(selectedDates)
@@ -111,7 +110,29 @@ export default function Calendar({
     setDragPreview(new Set())
   }
 
-  // ── Navigation ───────────────────────────────────────────────────
+  // ── Click/keyboard delegation (replaces per-cell onClick/onKeyboardActivate) ──
+  function handleGridClick(e) {
+    if (mode !== 'range') return
+    const dateEl = e.target.closest('[data-date]')
+    const ds = dateEl?.getAttribute('data-date')
+    if (!ds || dateEl?.getAttribute('data-disabled') === 'true') return
+    handleRangeClick(ds)
+  }
+
+  function handleGridKeyDown(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    const dateEl = e.target.closest('[data-date]')
+    const ds = dateEl?.getAttribute('data-date')
+    if (!ds || dateEl?.getAttribute('data-disabled') === 'true') return
+    e.preventDefault()
+    if (mode === 'multi') {
+      toggleRef.current?.(ds)
+    } else {
+      handleRangeClick(ds)
+    }
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────
   const canPrev = () => {
     const minD = new Date(minStr)
     return !(year < minD.getFullYear() || (year === minD.getFullYear() && month <= minD.getMonth()))
@@ -127,7 +148,7 @@ export default function Calendar({
     else setMonth(m => m + 1)
   }
 
-  // ── Range mode helpers ───────────────────────────────────────────
+  // ── Range mode helpers ────────────────────────────────────────────
   const handleRangeClick = useCallback((ds) => {
     if (rangeFrom && rangeTo) { onRangeChange?.(ds, null); return }
     if (!rangeFrom)            { onRangeChange?.(ds, null); return }
@@ -158,13 +179,23 @@ export default function Calendar({
     return ''
   }
 
-  // ── Build cells ──────────────────────────────────────────────────
-  const firstDow    = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  // ── Build cells (memoised — only recomputes on month/year change) ──
+  const cells = useMemo(() => {
+    const firstDow    = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const arr = []
+    for (let i = 0; i < firstDow; i++) arr.push(null)
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds  = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      const dow = new Date(year, month, d).getDay()
+      arr.push({ d, ds, dow })
+    }
+    return arr
+  }, [year, month])
 
-  const cells = []
-  for (let i = 0; i < firstDow; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  // Stable hover props — same reference for all cells in one render
+  const onHoverIn  = mode === 'range' && rangeFrom && !rangeTo ? setHover       : null
+  const onHoverOut = mode === 'range' && rangeFrom && !rangeTo ? handleHoverOut : null
 
   return (
     <div>
@@ -213,12 +244,13 @@ export default function Calendar({
         onPointerMove={handleGridPointerMove}
         onPointerUp={handleGridPointerUp}
         onPointerCancel={handleGridPointerCancel}
+        onClick={mode === 'range' ? handleGridClick : undefined}
+        onKeyDown={handleGridKeyDown}
       >
-        {cells.map((d, idx) => {
-          if (d === null) return <div key={`e${idx}`} className="min-h-[44px]" />
-          const ds      = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-          const dow     = new Date(year, month, d).getDay()
-          const isPast  = ds < minStr
+        {cells.map((cell, idx) => {
+          if (cell === null) return <div key={`e${idx}`} className="min-h-[44px]" />
+          const { d, ds, dow } = cell
+          const isPast    = ds < minStr
           const isAllowed = !allowedDates || allowedDates.has(ds)
           return (
             <HeatmapCell
@@ -236,10 +268,8 @@ export default function Calendar({
               rangeClass={getRangeClass(ds)}
               mode={mode}
               heatData={heatmapData?.get(ds) ?? null}
-              onHoverIn={mode === 'range' && rangeFrom && !rangeTo ? setHover : null}
-              onHoverOut={mode === 'range' && rangeFrom && !rangeTo ? handleHoverOut : null}
-              onClick={mode === 'range' ? () => handleRangeClick(ds) : undefined}
-              onKeyboardActivate={mode === 'multi' ? () => onDateToggle?.(ds) : undefined}
+              onHoverIn={onHoverIn}
+              onHoverOut={onHoverOut}
             />
           )
         })}

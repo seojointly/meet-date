@@ -1,17 +1,24 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 export function useAppointment(roomId) {
   const [appointment, setAppointment] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]         = useState(true)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const fetchAppointment = useCallback(async () => {
     if (!roomId) return
     const { data, error } = await supabase
       .from('appointments')
-      .select('*')
+      .select('id, room_id, confirmed_date, memo')
       .eq('room_id', roomId)
       .maybeSingle()
+    if (!mounted.current) return
     if (error) {
       console.error('[useAppointment/fetchAppointment]', error)
     } else {
@@ -48,7 +55,7 @@ export function useAppointment(roomId) {
       .delete()
       .eq('room_id', roomId)
     if (error) throw error
-    setAppointment(null)
+    if (mounted.current) setAppointment(null)
   }, [roomId])
 
   const saveMemo = useCallback(async (memo) => {

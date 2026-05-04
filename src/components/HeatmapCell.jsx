@@ -17,13 +17,10 @@ function HeatmapCell({
   heatData,
   onHoverIn,
   onHoverOut,
-  onClick,
-  onKeyboardActivate,
 }) {
   const [tip, setTip] = useState(false)
   const disabled = isPast || (mode === 'multi' && !isAllowed)
 
-  // ── heatmap background (multi mode only) ────────────────────────
   let bgStyle = {}
   if (mode === 'multi') {
     if (isEditMode && isMySelection) {
@@ -34,7 +31,6 @@ function HeatmapCell({
     }
   }
 
-  // ── range mode styling ───────────────────────────────────────────
   let rangeBg = ''
   let rangeText = ''
   if (mode === 'range') {
@@ -74,7 +70,6 @@ function HeatmapCell({
 
   if (isToday && !rangeBg) base.push('ring-1 ring-inset ring-green-400 font-bold')
 
-  // ring priority: drag preview > edit mode selection > normal selection
   if (isDragPreview) {
     base.push('ring-2 ring-green-400 ring-inset')
   } else if (isEditMode && isMySelection && mode === 'multi') {
@@ -96,14 +91,6 @@ function HeatmapCell({
         tabIndex={disabled ? -1 : 0}
         aria-label={dateStr}
         aria-pressed={isMySelection}
-        onClick={disabled ? undefined : onClick}
-        onKeyDown={e => {
-          if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault()
-            onClick?.()
-            onKeyboardActivate?.()
-          }
-        }}
         onMouseEnter={() => { onHoverIn?.(dateStr); if (heatData?.voters.length) setTip(true) }}
         onMouseLeave={() => { onHoverOut?.(); setTip(false) }}
         onTouchStart={() => { if (heatData?.voters.length) setTip(t => !t) }}
@@ -126,4 +113,13 @@ function HeatmapCell({
   )
 }
 
-export default memo(HeatmapCell)
+export default memo(HeatmapCell, (prev, next) =>
+  prev.dateStr === next.dateStr &&
+  prev.isMySelection === next.isMySelection &&
+  prev.isConfirmed === next.isConfirmed &&
+  prev.heatData === next.heatData &&
+  prev.isEditMode === next.isEditMode &&
+  prev.isDragPreview === next.isDragPreview &&
+  prev.rangeClass === next.rangeClass &&
+  prev.onHoverIn === next.onHoverIn
+)

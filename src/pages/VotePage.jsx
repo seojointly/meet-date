@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { CalendarDays, WifiOff } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
@@ -15,17 +15,22 @@ import NameModal from '../components/NameModal'
 import { formatDateLong, formatDateMedium, datesInRange } from '../utils/date'
 import { HEAT_COLORS } from '../constants/colors'
 
-// ── Helpers ──────────────────────────────────────────────────────
+// O(P×D) — pre-indexes availabilities by date before iterating allowedDates
 function buildHeatmapData(allowedDates, availabilities, participants) {
-  const map = new Map()
+  const map   = new Map()
   const total = participants.length
-  allowedDates.forEach(date => {
-    const voters = []
-    availabilities.forEach(a => {
-      if (a.participants && (a.dates ?? []).includes(date)) {
-        voters.push({ name: a.participants.name, color: a.participants.color })
-      }
+
+  const dateIndex = new Map()
+  availabilities.forEach(a => {
+    if (!a.participants) return
+    ;(a.dates ?? []).forEach(d => {
+      if (!dateIndex.has(d)) dateIndex.set(d, [])
+      dateIndex.get(d).push({ name: a.participants.name, color: a.participants.color })
     })
+  })
+
+  allowedDates.forEach(date => {
+    const voters = dateIndex.get(date) ?? []
     map.set(date, {
       voters,
       count: voters.length,
@@ -35,7 +40,7 @@ function buildHeatmapData(allowedDates, availabilities, participants) {
   return map
 }
 
-// ── ConnectionBanner ─────────────────────────────────────────────
+// ── ConnectionBanner ──────────────────────────────────────────────
 function ConnectionBanner({ status }) {
   if (status !== 'disconnected') return null
   return (
@@ -46,7 +51,7 @@ function ConnectionBanner({ status }) {
   )
 }
 
-// ── VotePage ─────────────────────────────────────────────────────
+// ── VotePage ──────────────────────────────────────────────────────
 export default function VotePage() {
   const { roomId } = useParams()
   const navigate   = useNavigate()
@@ -54,12 +59,12 @@ export default function VotePage() {
 
   const { room, roomLoading, roomError } = useRoom(roomId)
 
-  const [showNameModal, setShowNameModal]       = useState(false)
+  const [showNameModal, setShowNameModal]           = useState(false)
   const [showConfirmedModal, setShowConfirmedModal] = useState(false)
-  const [selectedDates, setSelectedDates]       = useState(new Set())
-  const [initDates, setInitDates]               = useState(false)
-  const [saving, setSaving]                     = useState(false)
-  const [isEditMode, setIsEditMode]             = useState(true)
+  const [selectedDates, setSelectedDates]           = useState(new Set())
+  const [initDates, setInitDates]                   = useState(false)
+  const [saving, setSaving]                         = useState(false)
+  const [isEditMode, setIsEditMode]                 = useState(true)
 
   const {
     participants,
@@ -72,7 +77,7 @@ export default function VotePage() {
   const { availabilities, connectionStatus, loading: vLoading, saveVotes } = useVotes(roomId)
   const { appointment, confirmDate, cancelAppointment } = useAppointment(roomId)
 
-  // document.title 설정
+  // document.title
   useEffect(() => {
     if (room) {
       document.title = `${room.title || '모임'} 날짜 투표 | 날짜 맞춰`
@@ -88,13 +93,13 @@ export default function VotePage() {
     prevStatus.current = connectionStatus
   }, [connectionStatus, showToast])
 
-  // 세션 복원 완료 후 모달 표시 여부 결정
+  // 세션 복원 완료 후 모달 표시 여부
   useEffect(() => {
     if (isRestoringSession) return
     setShowNameModal(!participantId)
   }, [isRestoringSession, participantId])
 
-  // 내 선택 날짜 초기화 (투표 데이터 로드 후 1회)
+  // 내 선택 날짜 초기화 (1회)
   useEffect(() => {
     if (initDates || vLoading || !participantId) return
     const my = availabilities.find(a => a.participant_id === participantId)
@@ -103,7 +108,7 @@ export default function VotePage() {
     setInitDates(true)
   }, [vLoading, participantId, availabilities, initDates])
 
-  // 파생 데이터
+  // ── 파생 데이터 ──────────────────────────────────────────────────
   const allowedDates = useMemo(() => {
     if (!room) return new Set()
     return new Set(datesInRange(room.date_from, room.date_to))
@@ -116,30 +121,35 @@ export default function VotePage() {
 
   const maxParticipants = room?.max_participants ?? 4
 
-  // 이미 투표 제출 여부
-  const hasSubmitted = !!(
-    participantId &&
-    (availabilities.find(a => a.participant_id === participantId)?.dates?.length ?? 0) > 0
+  const hasSubmitted = useMemo(() =>
+    !!(participantId &&
+      availabilities.some(a => a.participant_id === participantId && (a.dates?.length ?? 0) > 0)),
+    [availabilities, participantId]
   )
 
-  // ── 핸들러 ─────────────────────────────────────────────────────
-  async function handleRegister(name, pin) {
+  const myName = useMemo(
+    () => participants.find(p => p.id === participantId)?.name ?? '',
+    [participants, participantId]
+  )
+
+  // ── 핸들러 (useCallback으로 참조 안정화) ──────────────────────────
+  const handleRegister = useCallback(async (name, pin) => {
     const wasExisting = participants.some(p => p.name === name)
     await registerParticipant(name, maxParticipants, pin)
     setInitDates(false)
     setShowNameModal(false)
     showToast(wasExisting ? `${name}으로 재입장했어요!` : `${name}으로 참여했어요! 🎉`, 'success')
-  }
+  }, [participants, registerParticipant, maxParticipants, showToast])
 
-  function handleDateToggle(dateStr) {
+  const handleDateToggle = useCallback((dateStr) => {
     setSelectedDates(prev => {
       const next = new Set(prev)
       next.has(dateStr) ? next.delete(dateStr) : next.add(dateStr)
       return next
     })
-  }
+  }, [])
 
-  async function handleSaveVotes() {
+  const handleSaveVotes = useCallback(async () => {
     if (selectedDates.size === 0) {
       showToast('날짜를 1개 이상 선택해주세요', 'warning')
       return
@@ -155,9 +165,9 @@ export default function VotePage() {
     } finally {
       setSaving(false)
     }
-  }
+  }, [selectedDates, participantId, saveVotes, showToast])
 
-  async function handleConfirm(date) {
+  const handleConfirm = useCallback(async (date) => {
     try {
       await confirmDate(date)
       showToast(`${formatDateLong(date)}로 확정됐어요! 🎉`, 'success')
@@ -165,20 +175,18 @@ export default function VotePage() {
     } catch {
       showToast('확정에 실패했어요.', 'error')
     }
-  }
+  }, [confirmDate, showToast])
 
-  async function handleCancelAppointment() {
+  const handleCancelAppointment = useCallback(async () => {
     try {
       await cancelAppointment()
       showToast('확정이 취소됐어요.', 'info')
     } catch {
       showToast('취소에 실패했어요.', 'error')
     }
-  }
+  }, [cancelAppointment, showToast])
 
-  const myName = participants.find(p => p.id === participantId)?.name ?? ''
-
-  // ── 로딩 / 에러 상태 ──────────────────────────────────────────
+  // ── 로딩 / 에러 상태 ─────────────────────────────────────────────
   if (roomLoading || isRestoringSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -206,12 +214,11 @@ export default function VotePage() {
   const initialMonth  = room ? Number(room.date_from.split('-')[1]) - 1 : undefined
   const initialYear   = room ? Number(room.date_from.split('-')[0])      : undefined
 
-  // ── 렌더 ──────────────────────────────────────────────────────
+  // ── 렌더 ─────────────────────────────────────────────────────────
   return (
     <div className={`min-h-screen bg-gray-50 ${connectionStatus === 'disconnected' ? 'pt-8' : ''}`}>
       <ConnectionBanner status={connectionStatus} />
 
-      {/* 상단 고정 영역 */}
       <div className="sticky top-0 z-40">
         <ConfirmedBanner confirmedDate={confirmedDate} onCancel={handleCancelAppointment} />
         <header className="bg-white border-b border-gray-100 px-4 py-3">
@@ -247,11 +254,10 @@ export default function VotePage() {
         </header>
       </div>
 
-      {/* 메인 컨텐츠 */}
       <main className="max-w-5xl mx-auto px-4 py-5">
         <div className="lg:grid lg:grid-cols-[60%_40%] lg:gap-6">
 
-          {/* ── 좌: 캘린더 카드 ── */}
+          {/* 좌: 캘린더 카드 */}
           <div className="space-y-4 mb-5 lg:mb-0">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <div className="flex items-center justify-between mb-4">
@@ -315,7 +321,7 @@ export default function VotePage() {
             </div>
           </div>
 
-          {/* ── 우: 순위 카드 ── */}
+          {/* 우: 순위 카드 */}
           <div className="lg:sticky lg:top-20 lg:self-start">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
               <div className="mb-4">

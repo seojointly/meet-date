@@ -5,7 +5,13 @@ export function useVotes(roomId) {
   const [availabilities, setAvailabilities] = useState([])
   const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [loading, setLoading] = useState(true)
-  const pollRef = useRef(null)
+  const pollRef   = useRef(null)
+  const mounted   = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const fetchAvailabilities = useCallback(async () => {
     if (!roomId) return
@@ -13,6 +19,7 @@ export function useVotes(roomId) {
       .from('availabilities')
       .select('id, participant_id, dates, participants(id, name, color)')
       .eq('room_id', roomId)
+    if (!mounted.current) return
     if (error) {
       console.error('[useVotes/fetchAvailabilities]', error)
     } else {

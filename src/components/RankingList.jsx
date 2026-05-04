@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { CheckCircle, RefreshCw } from 'lucide-react'
 import { formatDateLong } from '../utils/date'
 
 const MEDAL = ['🥇', '🥈', '🥉']
 
-export default function RankingList({
+function RankingList({
   allowedDates,
   availabilities,
   participants,
@@ -124,3 +124,5 @@ export default function RankingList({
     </div>
   )
 }
+
+export default memo(RankingList)

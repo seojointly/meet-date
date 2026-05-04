@@ -1,17 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { PARTICIPANT_COLORS } from '../constants/colors'
 
 const storageKey = (roomId) => `participant_${roomId}`
 
 // pin은 클라이언트 상태에 노출하지 않음 — 검증은 별도 쿼리로 수행
-const PARTICIPANT_FIELDS = 'id, room_id, name, color, created_at'
+const PARTICIPANT_FIELDS = 'id, name, color, created_at'
 
 export function useParticipants(roomId) {
   const [participants, setParticipants] = useState([])
   const [loading, setLoading] = useState(true)
   const [participantId, setParticipantId] = useState(null)
   const [isRestoringSession, setIsRestoringSession] = useState(true)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const fetchParticipants = useCallback(async () => {
     if (!roomId) return
@@ -20,6 +26,7 @@ export function useParticipants(roomId) {
       .select(PARTICIPANT_FIELDS)
       .eq('room_id', roomId)
       .order('created_at')
+    if (!mounted.current) return
     if (error) {
       console.error('[useParticipants/fetchParticipants]', error)
     } else {
