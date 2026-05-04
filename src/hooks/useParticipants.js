@@ -6,7 +6,6 @@ import {
   createParticipant,
   fetchParticipantById,
   fetchParticipantByName,
-  verifyPin,
 } from '../services/participantService'
 
 const storageKey = (roomId) => `participant_${roomId}`
@@ -105,25 +104,13 @@ export function useParticipants(roomId) {
     return () => { supabase.removeChannel(ch) }
   }, [roomId, fetchParticipants])
 
-  const registerParticipant = useCallback(async (name, maxParticipants, pin = null) => {
-    const existing = participants.find(p => p.name === name)
-
-    if (existing) {
-      // 재입장: PIN 검증 — 불일치 시 verifyPin이 WRONG_PIN 에러 throw
-      await verifyPin({ roomId, name: existing.name, pin })
-      localStorage.setItem(storageKey(roomId), JSON.stringify({ id: existing.id, name, pin: pin ?? null }))
-      setParticipantId(existing.id)
-      return existing
-    }
-
-    // 신규 참여자
+  const registerNewParticipant = useCallback(async (name, pin, maxParticipants) => {
     if (isRoomFull(participants, maxParticipants)) {
       throw Object.assign(
         new Error(`정원이 가득 찼습니다 (${participants.length}/${maxParticipants})`),
         { code: 'FULL' }
       )
     }
-
     const color = assignColor(participants.length)
     try {
       const data = await createParticipant({ roomId, name, color, pin })
@@ -139,12 +126,18 @@ export function useParticipants(roomId) {
     }
   }, [roomId, participants, fetchParticipants])
 
+  const restoreParticipant = useCallback(async (id, name, pin) => {
+    localStorage.setItem(storageKey(roomId), JSON.stringify({ id, name, pin: pin ?? null }))
+    setParticipantId(id)
+  }, [roomId])
+
   return {
     participants,
     loading,
     participantId,
     isRestoringSession,
-    registerParticipant,
+    registerNewParticipant,
+    restoreParticipant,
     refetch: fetchParticipants,
   }
 }

@@ -43,6 +43,30 @@ export async function fetchParticipantByName({ roomId, name }) {
   return data ?? null
 }
 
+export async function checkExistingParticipant({ roomId, name }) {
+  const { data } = await supabase
+    .from('participants')
+    .select('id')
+    .eq('room_id', roomId)
+    .eq('name', name)
+    .maybeSingle()
+  return data ? { exists: true } : { exists: false }
+}
+
+export async function verifyParticipantPin({ roomId, name, pin }) {
+  const { data, error } = await supabase
+    .from('participants')
+    .select('id, pin')
+    .eq('room_id', roomId)
+    .eq('name', name)
+    .single()
+  if (error) throw error
+  if (data.pin !== null && data.pin !== pin) {
+    return { verified: false }
+  }
+  return { verified: true, participantId: data.id }
+}
+
 // 재입장 시 PIN 검증 — 불일치 시 code:'WRONG_PIN' 에러 throw
 export async function verifyPin({ roomId, name, pin }) {
   const { data, error } = await supabase

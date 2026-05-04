@@ -23,13 +23,18 @@ export function useRoom(roomId) {
     fetchRoom(roomId)
       .then(data => {
         if (cancelled) return
+        if (!data) {
+          setRoomError({ type: 'NOT_FOUND', message: '존재하지 않거나 만료된 방입니다.' })
+          setRoomLoading(false)
+          return
+        }
         cacheRef.current[roomId] = data
         setRoom(data)
         setRoomLoading(false)
       })
       .catch(() => {
         if (cancelled) return
-        setRoomError('존재하지 않는 방입니다.')
+        setRoomError({ type: 'NOT_FOUND', message: '존재하지 않거나 만료된 방입니다.' })
         setRoomLoading(false)
       })
 

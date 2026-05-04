@@ -47,7 +47,8 @@ export default function VotePage() {
     loading: pLoading,
     participantId,
     isRestoringSession,
-    registerParticipant,
+    registerNewParticipant,
+    restoreParticipant,
   } = useParticipants(roomId)
 
   const { availabilities, connectionStatus, loading: vLoading, saveVotes } = useVotes(roomId)
@@ -108,13 +109,19 @@ export default function VotePage() {
   )
 
   // ── 핸들러 (useCallback으로 참조 안정화) ──────────────────────────
-  const handleRegister = useCallback(async (name, pin) => {
-    const wasExisting = participants.some(p => p.name === name)
-    await registerParticipant(name, maxParticipants, pin)
+  const handleRegisterNew = useCallback(async (name, pin) => {
+    await registerNewParticipant(name, pin, maxParticipants)
     setInitDates(false)
     setShowNameModal(false)
-    showToast(wasExisting ? `${name}으로 재입장했어요!` : `${name}으로 참여했어요! 🎉`, 'success')
-  }, [participants, registerParticipant, maxParticipants, showToast])
+    showToast(`${name}으로 참여했어요! 🎉`, 'success')
+  }, [registerNewParticipant, maxParticipants, showToast])
+
+  const handleRestore = useCallback(async (id, name, pin) => {
+    await restoreParticipant(id, name, pin)
+    setInitDates(false)
+    setShowNameModal(false)
+    showToast(`${name}으로 재입장했어요!`, 'success')
+  }, [restoreParticipant, showToast])
 
   const handleDateToggle = useCallback((dateStr) => {
     setSelectedDates(prev => {
@@ -173,14 +180,19 @@ export default function VotePage() {
   if (roomError) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center bg-gray-50">
-        <span className="text-5xl">😕</span>
-        <p className="font-semibold text-gray-800">{roomError}</p>
-        <Link
-          to="/"
-          className="text-green-600 underline text-sm focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 rounded"
-        >
-          새 방 만들기
-        </Link>
+        <div className="text-center space-y-3">
+          <span className="text-5xl">🗓️</span>
+          <p className="font-semibold text-gray-800">존재하지 않거나 만료된 방이에요.</p>
+          <p className="text-sm text-gray-500">
+            약속 날짜로부터 3일이 지난 방은 자동으로 삭제됩니다.
+          </p>
+          <Link
+            to="/"
+            className="inline-block text-green-600 underline text-sm focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 rounded"
+          >
+            새 방 만들기
+          </Link>
+        </div>
       </div>
     )
   }
@@ -257,6 +269,13 @@ export default function VotePage() {
                 </div>
               )}
 
+              {(!hasSubmitted || isEditMode) && (
+                <div className="flex items-center gap-1.5 text-xs text-blue-500 bg-blue-50 rounded-lg px-3 py-2 mb-2">
+                  <span>👆</span>
+                  <span>날짜를 누르거나 <strong>드래그</strong>해서 연속으로 선택할 수 있어요!</span>
+                </div>
+              )}
+
               <Calendar
                 mode="multi"
                 initialYear={initialYear}
@@ -323,9 +342,11 @@ export default function VotePage() {
 
       <NameModal
         isOpen={showNameModal}
+        roomId={roomId}
         participants={participants}
         maxParticipants={maxParticipants}
-        onSubmit={handleRegister}
+        onRegisterNew={handleRegisterNew}
+        onRestore={handleRestore}
       />
 
       <ConfirmedModal
