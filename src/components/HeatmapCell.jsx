@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { HEAT_COLORS } from '../constants/colors'
+import { HEAT_COLORS } from '../domain/constants'
 
 function HeatmapCell({
   day,

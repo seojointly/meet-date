@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { PARTICIPANT_COLORS } from '../constants/colors'
+import { assignColor, isRoomFull } from '../domain/participant'
 import {
   fetchParticipants as fetchParticipantsService,
   createParticipant,
@@ -117,14 +117,14 @@ export function useParticipants(roomId) {
     }
 
     // 신규 참여자
-    if (participants.length >= maxParticipants) {
+    if (isRoomFull(participants, maxParticipants)) {
       throw Object.assign(
         new Error(`정원이 가득 찼습니다 (${participants.length}/${maxParticipants})`),
         { code: 'FULL' }
       )
     }
 
-    const color = PARTICIPANT_COLORS[participants.length % PARTICIPANT_COLORS.length]
+    const color = assignColor(participants.length)
     try {
       const data = await createParticipant({ roomId, name, color, pin })
       localStorage.setItem(storageKey(roomId), JSON.stringify({ id: data.id, name: data.name, pin: pin ?? null }))

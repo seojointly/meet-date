@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react'
 import { CheckCircle, RefreshCw } from 'lucide-react'
-import { formatDateLong } from '../utils/date'
+import { formatDateLong } from '../domain/date'
+import { buildRanking } from '../domain/vote'
 
 const MEDAL = ['🥇', '🥈', '🥉']
 
@@ -13,23 +14,10 @@ function RankingList({
   onCancel,
   maxParticipants,
 }) {
-  const ranked = useMemo(() => {
-    if (!allowedDates) return []
-    const countMap = new Map()
-    allowedDates.forEach(d => countMap.set(d, []))
-
-    availabilities.forEach(a => {
-      const p = a.participants
-      if (!p) return
-      ;(a.dates ?? []).forEach(d => {
-        if (countMap.has(d)) countMap.get(d).push({ name: p.name, color: p.color })
-      })
-    })
-
-    return [...countMap.entries()]
-      .filter(([, voters]) => voters.length > 0)
-      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
-  }, [allowedDates, availabilities])
+  const ranked = useMemo(
+    () => allowedDates ? buildRanking(allowedDates, availabilities) : [],
+    [allowedDates, availabilities]
+  )
 
   const total = participants.length
 

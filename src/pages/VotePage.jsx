@@ -12,33 +12,9 @@ import ParticipantBar from '../components/ParticipantBar'
 import ConfirmedBanner from '../components/ConfirmedBanner'
 import ConfirmedModal from '../components/ConfirmedModal'
 import NameModal from '../components/NameModal'
-import { formatDateLong, formatDateMedium, datesInRange } from '../utils/date'
-import { HEAT_COLORS } from '../constants/colors'
-
-// O(P×D) — pre-indexes availabilities by date before iterating allowedDates
-function buildHeatmapData(allowedDates, availabilities, participants) {
-  const map   = new Map()
-  const total = participants.length
-
-  const dateIndex = new Map()
-  availabilities.forEach(a => {
-    if (!a.participants) return
-    ;(a.dates ?? []).forEach(d => {
-      if (!dateIndex.has(d)) dateIndex.set(d, [])
-      dateIndex.get(d).push({ name: a.participants.name, color: a.participants.color })
-    })
-  })
-
-  allowedDates.forEach(date => {
-    const voters = dateIndex.get(date) ?? []
-    map.set(date, {
-      voters,
-      count: voters.length,
-      allAvailable: total > 0 && voters.length === total,
-    })
-  })
-  return map
-}
+import { formatDateLong, formatDateMedium, datesInRange } from '../domain/date'
+import { HEAT_COLORS } from '../domain/constants'
+import { buildHeatmapData, hasUserSubmitted } from '../domain/vote'
 
 // ── ConnectionBanner ──────────────────────────────────────────────
 function ConnectionBanner({ status }) {
@@ -121,9 +97,8 @@ export default function VotePage() {
 
   const maxParticipants = room?.max_participants ?? 4
 
-  const hasSubmitted = useMemo(() =>
-    !!(participantId &&
-      availabilities.some(a => a.participant_id === participantId && (a.dates?.length ?? 0) > 0)),
+  const hasSubmitted = useMemo(
+    () => hasUserSubmitted(availabilities, participantId),
     [availabilities, participantId]
   )
 

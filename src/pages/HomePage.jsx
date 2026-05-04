@@ -4,7 +4,7 @@ import { CalendarDays, X, ArrowRight } from 'lucide-react'
 import { createRoom } from '../services/roomService'
 import { useToast } from '../contexts/ToastContext'
 import Calendar from '../components/Calendar'
-import { MAX_PARTICIPANTS_LIMIT } from '../constants/colors'
+import { MAX_PARTICIPANTS_LIMIT } from '../domain/constants'
 
 function formatDate(str) {
   if (!str) return '—'

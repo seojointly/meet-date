@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { formatDateFull } from '../utils/date'
+import { formatDateFull } from '../domain/date'
 
 export default function ConfirmedModal({ isOpen, confirmedDate, roomId, onClose }) {
   const navigate = useNavigate()

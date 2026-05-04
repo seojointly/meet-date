@@ -6,15 +6,8 @@ import { useParticipants } from '../hooks/useParticipants'
 import { useAppointment } from '../hooks/useAppointment'
 import { useParticipantTimes } from '../hooks/useParticipantTimes'
 import { useRoom } from '../hooks/useRoom'
-import { formatDateFull } from '../utils/date'
-
-function formatTime(timeStr) {
-  if (!timeStr) return ''
-  const [h, m] = timeStr.split(':').map(Number)
-  const period = h < 12 ? '오전' : '오후'
-  const hour = h === 0 ? 12 : h > 12 ? h - 12 : h
-  return m === 0 ? `${period} ${hour}시` : `${period} ${hour}시 ${m}분`
-}
+import { formatDateFull } from '../domain/date'
+import { toHHMM, calcOverlap, formatTimeRange } from '../domain/time'
 
 export default function ConfirmedPage() {
   const { roomId } = useParams()
@@ -52,7 +45,6 @@ export default function ConfirmedPage() {
   // 내 시간 동기화
   useEffect(() => {
     if (!participantId) return
-    const toHHMM = (t) => t ? t.slice(0, 5) : ''
     const pt = times.find(pt => pt.participant_id === participantId)
     if (pt?.start_time) setMyStartTime(toHHMM(pt.start_time))
     if (pt?.end_time) setMyEndTime(toHHMM(pt.end_time))
@@ -65,18 +57,10 @@ export default function ConfirmedPage() {
       times.some(t => t.participant_id === p.id && t.start_time && t.end_time)
     )
     if (!allSubmitted) return { allSubmitted: false, overlapResult: null }
-    const starts = participants.map(p =>
-      times.find(t => t.participant_id === p.id)?.start_time
-    ).filter(Boolean)
-    const ends = participants.map(p =>
-      times.find(t => t.participant_id === p.id)?.end_time
-    ).filter(Boolean)
-    const maxStart = starts.reduce((a, b) => a > b ? a : b)
-    const minEnd   = ends.reduce((a, b) => a < b ? a : b)
-    return {
-      allSubmitted: true,
-      overlapResult: maxStart < minEnd ? { start: maxStart, end: minEnd } : null,
-    }
+    const participantTimes = participants
+      .map(p => times.find(t => t.participant_id === p.id))
+      .filter(Boolean)
+    return { allSubmitted: true, overlapResult: calcOverlap(participantTimes) }
   }, [participants, times])
 
   async function handleSaveTime() {
@@ -178,7 +162,7 @@ export default function ConfirmedPage() {
                 <>
                   <p className="text-sm font-semibold text-green-700">⏰ 모두 가능한 시간</p>
                   <p className="text-base font-bold text-green-800 mt-1">
-                    {formatTime(overlapResult.start)} ~ {formatTime(overlapResult.end)}
+                    {formatTimeRange(overlapResult.overlapStart, overlapResult.overlapEnd)}
                   </p>
                   <p className="text-xs text-green-600 mt-0.5">({participants.length}명 모두 가능)</p>
                 </>
@@ -194,8 +178,8 @@ export default function ConfirmedPage() {
             {participants.map(p => {
               const isMe      = p.id === participantId
               const saved     = times.find(t => t.participant_id === p.id)
-              const savedStart = saved?.start_time ? saved.start_time.slice(0, 5) : null
-              const savedEnd   = saved?.end_time   ? saved.end_time.slice(0, 5)   : null
+              const savedStart = toHHMM(saved?.start_time)
+              const savedEnd   = toHHMM(saved?.end_time)
               return (
                 <div
                   key={p.id}
@@ -214,7 +198,7 @@ export default function ConfirmedPage() {
                     {!isMe && (
                       <span className="text-sm text-gray-500 shrink-0">
                         {savedStart && savedEnd
-                          ? `${formatTime(savedStart)} ~ ${formatTime(savedEnd)}`
+                          ? formatTimeRange(savedStart, savedEnd)
                           : '미입력'}
                       </span>
                     )}

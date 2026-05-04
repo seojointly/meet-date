@@ -1,5 +1,5 @@
 import { CheckCircle } from 'lucide-react'
-import { formatDateLong } from '../utils/date'
+import { formatDateLong } from '../domain/date'
 
 export default function ConfirmedBanner({ confirmedDate, onCancel }) {
   if (!confirmedDate) return null

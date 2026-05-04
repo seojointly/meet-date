@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import HeatmapCell from './HeatmapCell'
-import { WEEKDAYS } from '../utils/date'
-import { MAX_CALENDAR_YEAR } from '../constants/colors'
+import { WEEKDAYS } from '../domain/date'
+import { MAX_CALENDAR_YEAR } from '../domain/constants'
 
 function toDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

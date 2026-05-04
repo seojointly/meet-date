@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Users } from 'lucide-react'
+import { validatePin, isRoomFull } from '../domain/participant'
 
 export default function NameModal({ isOpen, participants, maxParticipants, onSubmit }) {
   const [name, setName]         = useState('')
@@ -11,7 +12,7 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
 
   const trimmedName = name.trim()
   const isExisting  = !!trimmedName && participants.some(p => p.name === trimmedName)
-  const isFull      = participants.length >= maxParticipants
+  const isFull      = isRoomFull(participants, maxParticipants)
 
   useEffect(() => {
     if (isOpen) {
@@ -27,7 +28,7 @@ export default function NameModal({ isOpen, participants, maxParticipants, onSub
   async function handleSubmit(e) {
     e.preventDefault()
     if (!trimmedName) { setError('이름을 입력해주세요'); return }
-    if (pin && !/^\d{4}$/.test(pin)) { setPinError('숫자 4자리를 입력해주세요'); return }
+    if (pin && !validatePin(pin)) { setPinError('숫자 4자리를 입력해주세요'); return }
 
     setLoading(true)
     setError('')
