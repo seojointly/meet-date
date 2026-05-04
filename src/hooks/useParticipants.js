@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { PARTICIPANT_COLORS } from '../constants/colors'
+import {
+  fetchParticipants as fetchParticipantsService,
+  createParticipant,
+  fetchParticipantById,
+  fetchParticipantByName,
+  verifyPin,
+} from '../services/participantService'
 
 const storageKey = (roomId) => `participant_${roomId}`
-
-// pin은 클라이언트 상태에 노출하지 않음 — 검증은 별도 쿼리로 수행
-const PARTICIPANT_FIELDS = 'id, name, color, created_at'
 
 export function useParticipants(roomId) {
   const [participants, setParticipants] = useState([])
@@ -21,18 +25,16 @@ export function useParticipants(roomId) {
 
   const fetchParticipants = useCallback(async () => {
     if (!roomId) return
-    const { data, error } = await supabase
-      .from('participants')
-      .select(PARTICIPANT_FIELDS)
-      .eq('room_id', roomId)
-      .order('created_at')
-    if (!mounted.current) return
-    if (error) {
-      console.error('[useParticipants/fetchParticipants]', error)
-    } else {
-      setParticipants(data ?? [])
+    try {
+      const data = await fetchParticipantsService(roomId)
+      if (!mounted.current) return
+      setParticipants(data)
+      setLoading(false)
+    } catch (err) {
+      if (!mounted.current) return
+      console.error('[useParticipants/fetchParticipants]', err)
+      setLoading(false)
     }
-    setLoading(false)
   }, [roomId])
 
   useEffect(() => {
@@ -47,32 +49,23 @@ export function useParticipants(roomId) {
           const { id, name, pin } = JSON.parse(stored)
           const storedPin = pin ?? null
 
-          // 1. id로 복원 시도
-          const { data, error } = await supabase
-            .from('participants')
-            .select('id')
-            .eq('id', id)
-            .maybeSingle()
+          // 1. id로 복원 시도 — 실패 시 null 반환 (에러 무시하고 name으로 폴백)
+          const byId = await fetchParticipantById(id)
 
           if (cancelled) return
 
-          if (!error && data) {
+          if (byId) {
             setParticipantId(id)
           } else if (name) {
             // 2. name + room_id로 복원 시도
-            const { data: nameData, error: nameError } = await supabase
-              .from('participants')
-              .select('id, pin')
-              .eq('room_id', roomId)
-              .eq('name', name)
-              .maybeSingle()
+            const byName = await fetchParticipantByName({ roomId, name })
 
             if (cancelled) return
 
-            if (!nameError && nameData) {
-              if (nameData.pin === null || nameData.pin === storedPin) {
-                setParticipantId(nameData.id)
-                localStorage.setItem(storageKey(roomId), JSON.stringify({ id: nameData.id, name, pin: storedPin }))
+            if (byName) {
+              if (byName.pin === null || byName.pin === storedPin) {
+                setParticipantId(byName.id)
+                localStorage.setItem(storageKey(roomId), JSON.stringify({ id: byName.id, name, pin: storedPin }))
               } else {
                 localStorage.removeItem(storageKey(roomId))
               }
@@ -116,18 +109,8 @@ export function useParticipants(roomId) {
     const existing = participants.find(p => p.name === name)
 
     if (existing) {
-      // 재입장: PIN 검증 (participants state에 pin이 없으므로 별도 조회)
-      const { data: pData, error: pError } = await supabase
-        .from('participants')
-        .select('id, pin')
-        .eq('id', existing.id)
-        .single()
-      if (pError) throw pError
-
-      if (pData.pin !== null && pData.pin !== pin) {
-        throw Object.assign(new Error('PIN이 올바르지 않아요'), { code: 'WRONG_PIN' })
-      }
-
+      // 재입장: PIN 검증 — 불일치 시 verifyPin이 WRONG_PIN 에러 throw
+      await verifyPin({ roomId, name: existing.name, pin })
       localStorage.setItem(storageKey(roomId), JSON.stringify({ id: existing.id, name, pin: pin ?? null }))
       setParticipantId(existing.id)
       return existing
@@ -142,21 +125,18 @@ export function useParticipants(roomId) {
     }
 
     const color = PARTICIPANT_COLORS[participants.length % PARTICIPANT_COLORS.length]
-    const { data, error } = await supabase
-      .from('participants')
-      .insert({ room_id: roomId, name, color, pin: pin || null })
-      .select(PARTICIPANT_FIELDS)
-      .single()
-    if (error) {
-      if (error.code === '23505') {
+    try {
+      const data = await createParticipant({ roomId, name, color, pin })
+      localStorage.setItem(storageKey(roomId), JSON.stringify({ id: data.id, name: data.name, pin: pin ?? null }))
+      setParticipantId(data.id)
+      await fetchParticipants()
+      return data
+    } catch (err) {
+      if (err.code === '23505') {
         throw Object.assign(new Error('이미 사용 중인 이름입니다'), { code: 'DUPLICATE' })
       }
-      throw error
+      throw err
     }
-    localStorage.setItem(storageKey(roomId), JSON.stringify({ id: data.id, name: data.name, pin: pin ?? null }))
-    setParticipantId(data.id)
-    await fetchParticipants()
-    return data
   }, [roomId, participants, fetchParticipants])
 
   return {

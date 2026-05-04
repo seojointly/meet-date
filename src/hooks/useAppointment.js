@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import {
+  fetchAppointment as fetchAppointmentService,
+  confirmDate as confirmDateService,
+  cancelAppointment as cancelAppointmentService,
+  saveMemo as saveMemoService,
+} from '../services/appointmentService'
 
 export function useAppointment(roomId) {
   const [appointment, setAppointment] = useState(null)
@@ -13,18 +19,16 @@ export function useAppointment(roomId) {
 
   const fetchAppointment = useCallback(async () => {
     if (!roomId) return
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('id, room_id, confirmed_date, memo')
-      .eq('room_id', roomId)
-      .maybeSingle()
-    if (!mounted.current) return
-    if (error) {
-      console.error('[useAppointment/fetchAppointment]', error)
-    } else {
-      setAppointment(data ?? null)
+    try {
+      const data = await fetchAppointmentService(roomId)
+      if (!mounted.current) return
+      setAppointment(data)
+      setLoading(false)
+    } catch (err) {
+      if (!mounted.current) return
+      console.error('[useAppointment/fetchAppointment]', err)
+      setLoading(false)
     }
-    setLoading(false)
   }, [roomId])
 
   useEffect(() => { fetchAppointment() }, [fetchAppointment])
@@ -42,28 +46,17 @@ export function useAppointment(roomId) {
   }, [roomId, fetchAppointment])
 
   const confirmDate = useCallback(async (date) => {
-    const { error } = await supabase
-      .from('appointments')
-      .upsert({ room_id: roomId, confirmed_date: date }, { onConflict: 'room_id' })
-    if (error) throw error
+    await confirmDateService({ roomId, date })
     await fetchAppointment()
   }, [roomId, fetchAppointment])
 
   const cancelAppointment = useCallback(async () => {
-    const { error } = await supabase
-      .from('appointments')
-      .delete()
-      .eq('room_id', roomId)
-    if (error) throw error
+    await cancelAppointmentService(roomId)
     if (mounted.current) setAppointment(null)
   }, [roomId])
 
   const saveMemo = useCallback(async (memo) => {
-    const { error } = await supabase
-      .from('appointments')
-      .update({ memo })
-      .eq('room_id', roomId)
-    if (error) throw error
+    await saveMemoService({ roomId, memo })
     await fetchAppointment()
   }, [roomId, fetchAppointment])
 

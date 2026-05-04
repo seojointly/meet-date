@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, X, ArrowRight } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { createRoom } from '../services/roomService'
 import { useToast } from '../contexts/ToastContext'
 import Calendar from '../components/Calendar'
 import { MAX_PARTICIPANTS_LIMIT } from '../constants/colors'
@@ -75,17 +75,12 @@ export default function HomePage() {
     if (!rangeFrom || !rangeTo) return
     setCreating(true)
     try {
-      const { data, error } = await supabase
-        .from('rooms')
-        .insert({
-          title: title.trim() || '모임',
-          date_from: rangeFrom,
-          date_to: rangeTo,
-          max_participants: maxParticipants,
-        })
-        .select('id')
-        .single()
-      if (error) throw error
+      const data = await createRoom({
+        title: title.trim() || '모임',
+        dateFrom: rangeFrom,
+        dateTo: rangeTo,
+        maxParticipants,
+      })
 
       const voteUrl = `${location.origin}/vote/${data.id}`
       try {

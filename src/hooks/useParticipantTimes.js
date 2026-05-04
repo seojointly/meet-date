@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchParticipantTimes as fetchTimesService, saveParticipantTime } from '../services/timeService'
 
 export function useParticipantTimes(roomId) {
   const [times, setTimes]     = useState([])
@@ -13,17 +14,16 @@ export function useParticipantTimes(roomId) {
 
   const fetchTimes = useCallback(async () => {
     if (!roomId) return
-    const { data, error } = await supabase
-      .from('participant_times')
-      .select('participant_id, room_id, start_time, end_time, participants(id, name, color)')
-      .eq('room_id', roomId)
-    if (!mounted.current) return
-    if (error) {
-      console.error('[useParticipantTimes/fetchTimes]', error)
-    } else {
-      setTimes(data ?? [])
+    try {
+      const data = await fetchTimesService(roomId)
+      if (!mounted.current) return
+      setTimes(data)
+      setLoading(false)
+    } catch (err) {
+      if (!mounted.current) return
+      console.error('[useParticipantTimes/fetchTimes]', err)
+      setLoading(false)
     }
-    setLoading(false)
   }, [roomId])
 
   useEffect(() => { fetchTimes() }, [fetchTimes])
@@ -41,13 +41,7 @@ export function useParticipantTimes(roomId) {
   }, [roomId, fetchTimes])
 
   const saveTime = useCallback(async (participantId, startTime, endTime) => {
-    const { error } = await supabase
-      .from('participant_times')
-      .upsert(
-        { room_id: roomId, participant_id: participantId, start_time: startTime, end_time: endTime },
-        { onConflict: 'room_id,participant_id' }
-      )
-    if (error) throw error
+    await saveParticipantTime({ roomId, participantId, startTime, endTime })
     await fetchTimes()
   }, [roomId, fetchTimes])
 

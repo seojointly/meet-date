@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchRoom } from '../services/roomService'
 
 export function useRoom(roomId) {
   const cacheRef = useRef({})
 
-  const [room, setRoom]           = useState(null)
+  const [room, setRoom]               = useState(null)
   const [roomLoading, setRoomLoading] = useState(true)
-  const [roomError, setRoomError] = useState(null)
+  const [roomError, setRoomError]     = useState(null)
 
   useEffect(() => {
     if (!roomId) return
@@ -20,15 +20,16 @@ export function useRoom(roomId) {
 
     let cancelled = false
 
-    supabase.from('rooms').select('id, title, date_from, date_to, max_participants').eq('id', roomId).single()
-      .then(({ data, error }) => {
+    fetchRoom(roomId)
+      .then(data => {
         if (cancelled) return
-        if (error || !data) {
-          setRoomError('존재하지 않는 방입니다.')
-        } else {
-          cacheRef.current[roomId] = data
-          setRoom(data)
-        }
+        cacheRef.current[roomId] = data
+        setRoom(data)
+        setRoomLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRoomError('존재하지 않는 방입니다.')
         setRoomLoading(false)
       })
 

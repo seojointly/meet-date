@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAvailabilities as fetchAvailabilitiesService, saveAvailability } from '../services/voteService'
 
 export function useVotes(roomId) {
   const [availabilities, setAvailabilities] = useState([])
   const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [loading, setLoading] = useState(true)
-  const pollRef   = useRef(null)
-  const mounted   = useRef(true)
+  const pollRef = useRef(null)
+  const mounted = useRef(true)
 
   useEffect(() => {
     mounted.current = true
@@ -15,17 +16,16 @@ export function useVotes(roomId) {
 
   const fetchAvailabilities = useCallback(async () => {
     if (!roomId) return
-    const { data, error } = await supabase
-      .from('availabilities')
-      .select('id, participant_id, dates, participants(id, name, color)')
-      .eq('room_id', roomId)
-    if (!mounted.current) return
-    if (error) {
-      console.error('[useVotes/fetchAvailabilities]', error)
-    } else {
-      setAvailabilities(data ?? [])
+    try {
+      const data = await fetchAvailabilitiesService(roomId)
+      if (!mounted.current) return
+      setAvailabilities(data)
+      setLoading(false)
+    } catch (err) {
+      if (!mounted.current) return
+      console.error('[useVotes/fetchAvailabilities]', err)
+      setLoading(false)
     }
-    setLoading(false)
   }, [roomId])
 
   const startPolling = useCallback(() => {
@@ -65,10 +65,7 @@ export function useVotes(roomId) {
   }, [roomId, fetchAvailabilities, startPolling, stopPolling])
 
   const saveVotes = useCallback(async (participantId, dates) => {
-    const { error } = await supabase
-      .from('availabilities')
-      .upsert({ participant_id: participantId, room_id: roomId, dates }, { onConflict: 'participant_id' })
-    if (error) throw error
+    await saveAvailability({ participantId, roomId, dates })
     await fetchAvailabilities()
   }, [roomId, fetchAvailabilities])
 
